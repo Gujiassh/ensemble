@@ -156,3 +156,11 @@
 - **原因**：多角色协作需要稳定的 Agent、Task、Crew 投影语义，同时必须保持编码执行引擎可替换。
 - **范围**：单 Agent 可以不实例化完整 Crew；多角色 Run 必须保留 CrewAI 投影路径。`pi` 仍是默认 Runner。
 - **覆盖**：本条覆盖 D019 中“可以移除 CrewAI”的开放项；其它前端、Backend 进程形态、协议和存储选择仍按 M6 Spike 决定。
+
+## D023 · F1 拆分为 Client Foundation 与 Desktop Integration（2026-08-18）
+
+- **决定**：F1 分为 F1-A 前端基础和 F1-B 桌面接线。F1-A 可以在 F0 进程形态决策前实施；F1-B 必须等待 F0 关闭。
+- **F1-A**：实现 App Shell、Design System、设备偏好、i18n、Workspace 创建交互和 typed gateway seam；生产入口不使用测试 adapter，不声称 Workspace 已持久化。
+- **F1-B**：接入 Tauri 平台偏好、原生目录选择器、选定的 Runtime transport、启动/退出生命周期和 bundled frontend 验证。
+- **原因**：视觉与交互基础不需要等待 Backend 选型，但固定端口、仓库路径、开发 `.venv` 或临时 API 一旦进入产品入口，会迫使后续增加兼容层。
+- **真源**：`specs/f1-shell-design-system.md`、`12-dev-plan.md`。

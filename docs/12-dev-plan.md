@@ -40,12 +40,14 @@
 
 ### F1 · Desktop Shell 与 Design System
 
+详细实施规格：[f1-shell-design-system.md](specs/f1-shell-design-system.md)。F1-A（F1-01 至 F1-15）负责前端基础，可在 F0 关闭前通过 gateway seam 先行；F1-B（F1-16 至 F1-20）负责 Tauri 与 Runtime 接线，必须等待 F0 的进程形态决策。
+
 交付：
 
-- Tauri 桌面入口和 Runtime 生命周期
+- Tauri 桌面入口和 Runtime 生命周期（Runtime 连接方式由 F0 Spike 决定；F1 前端先使用 gateway seam）
 - 画布优先布局：窄导航、全尺寸画布、按需 Inspector
 - Theme、Density、Motion、Contrast 和 Locale 注入
-- Workspace 创建：名称、项目目录、Runner、Agent 输出语言
+- Workspace 创建：名称、项目目录、Runner、Agent 输出语言（F1 负责表单和 gateway；持久化由 Runtime 阶段确认）
 - 无 Workspace 时的首次启动路径
 
 关闭条件：
@@ -159,4 +161,4 @@ F1 与 F2 可以在契约关闭后拆分，但协议和核心数据模型只能�
 
 ## 6. 当前下一步
 
-先完成 [m6-platform-packaging.md](specs/m6-platform-packaging.md) 定义的 Backend 进程形态 Spike，并把结论写回 [m6-architecture.md](specs/m6-architecture.md)、Runner Adapter 和平台 SSoT。Spike 关闭后，才开始 F1 的新桌面壳和 Design System 实现。
+先完成 [m6-platform-packaging.md](specs/m6-platform-packaging.md) 定义的 Backend 进程形态 Spike，并把结论写回 [m6-architecture.md](specs/m6-architecture.md)、Runner Adapter 和平台 SSoT。F1 的前端实现可以按 [f1-shell-design-system.md](specs/f1-shell-design-system.md) 先行，但不得在 F0 关闭前写死 sidecar、固定端口或开发 `.venv` 路径。

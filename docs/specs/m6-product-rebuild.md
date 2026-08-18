@@ -174,6 +174,8 @@ Windows、macOS、Linux 分别提供：
 9. Workspace 创建、编排编辑、自动保存和冲突交互规格
 10. Run、Attention、Artifact、暂停取消和恢复规格
 
+F1 的前端实施细节见 [f1-shell-design-system.md](f1-shell-design-system.md)。该规格的 gateway seam 允许 Shell/Design System 与 Runtime 进程形态解耦；它不替代 F0 的 Backend/Packaging Spike。
+
 完成上述设计后再拆分实际开发任务。
 
 ---
