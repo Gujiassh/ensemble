@@ -48,7 +48,7 @@
 | Runner | 底层模型、固定 pi 模式 |
 | Role | 画布中的具体 Agent 实例 |
 | Seat | Role 模板本身 |
-| Group | Stage 或 Workspace |
+| Group | 任意 Workflow 分段或 Workspace |
 | Handoff | 无含义的动画连线 |
 | Attention | 所有事项都叫通知 |
 | Inspector | 永久详情栏或卡片墙 |

@@ -2,7 +2,7 @@
 
 **Orchestrate agents with clarity and control.**
 
-Ensemble 是一款跨平台、本地优先的 Agent 编排桌面应用。用户创建 Workspace 时选择适合项目的 Runner，通过组织画布定义角色、关系、阶段和人机门禁，并在运行过程中观察、审批、打回、补充指令或重试。
+Ensemble 是一款跨平台、本地优先的 Agent 编排桌面应用。用户创建 Workspace 时选择适合项目的 Runner，通过组织画布定义角色、任务依赖、交付和人机门禁，并在运行过程中观察、审批、打回、补充指令或重试。
 
 ## 当前状态
 
@@ -40,6 +40,9 @@ Ensemble 是一款跨平台、本地优先的 Agent 编排桌面应用。用户�
 | [docs/ssot/i18n.md](docs/ssot/i18n.md) | UI Locale 与 Agent 输出语言 |
 | [docs/ssot/platform-adaptation.md](docs/ssot/platform-adaptation.md) | Windows、macOS、Linux 交付要求 |
 | [docs/specs/m6-product-rebuild.md](docs/specs/m6-product-rebuild.md) | M6 重建范围和验收 |
+| [docs/specs/m6-domain-model.md](docs/specs/m6-domain-model.md) | Organization、Workflow、Snapshot 和 RuntimeState 领域边界 |
+| [docs/specs/m6-orchestration-interaction.md](docs/specs/m6-orchestration-interaction.md) | Workspace 创建、编排编辑、保存、校验和启动交互 |
+| [docs/specs/m6-run-operations.md](docs/specs/m6-run-operations.md) | Run 状态机、人工介入、Artifact、事件对账和恢复 |
 | [docs/decisions.md](docs/decisions.md) | 决策记录 |
 
 旧的 M0–M5 技术、协议和实现文档保留为历史证据；若与上表冲突，以 V2/M6 文档为准。
@@ -58,7 +61,7 @@ pnpm dev:canvas
 
 ## 下一步
 
-1. 完成 V2 Domain model
+1. 完成 M6 领域、交互和运行期规格确认
 2. 评估跨平台 Backend 形态
 3. 定义 Workspace、Orchestration、Run、Event 和 Runner Adapter 合约
 4. 完成 Canvas 信息架构线框

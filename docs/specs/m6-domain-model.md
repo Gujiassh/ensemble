@@ -21,7 +21,7 @@ RuntimeState = 执行期间不断变化的状态、事件、Attention 和 Artifa
 
 - 一个 Seat 只有一个语义父节点
 - 一个 Task 只有一个负责 Seat
-- 一个 Run 只引用一个不可变 RunSnapshot
+- 一个 Run 以一个不可变 RunSnapshot 启动；Amendment 只能追加新的不可变 Snapshot 后代，不能原地改写
 - Run 启动后，Workspace 设置变化不能修改该 Run
 - Runner 密钥、Token 和登录态不进入 Workspace 或 Run 文件
 - Canvas 坐标不进入 Organization 或 Workflow 业务对象
@@ -334,6 +334,14 @@ timeoutPolicy?
 optional
 ```
 
+`failurePolicy`：
+
+```text
+stop_run | wait_human | route_failure | continue_optional
+```
+
+`continue_optional` 仅允许 `optional=true` 的 Task；`route_failure` 必须存在匹配的 `failure` Transition。
+
 规则：
 
 - 每个 Task 只有一个 owner Seat
@@ -356,7 +364,7 @@ gateId
 name
 kind
 requestedBySeatId?
-requiredArtifactIds[]
+requiredArtifactContractIds[]
 allowedActions[]
 blocking
 ```
@@ -366,6 +374,8 @@ blocking
 ```text
 approval | question
 ```
+
+首版 `blocking` 固定为 `true`。需要提醒但不阻断流程的事项使用普通 Runtime Event，不使用 Gate 伪装。
 
 ### 8.5 JoinDefinition
 
@@ -381,7 +391,7 @@ policy
 all | any
 ```
 
-`all` 等待所有到达分支，`any` 在首个满足条件的分支到达后继续，其余分支不自动取消。
+`all` 等待所有到达分支，`any` 在首个满足条件的分支到达后继续，其余分支继续执行，不自动取消；迟到结果只作为历史 Artifact 保留。
 
 ### 8.6 TransitionDefinition
 
@@ -399,6 +409,17 @@ reworkPolicy?
 ```text
 success | failure | approved | rejected | answered | always
 ```
+
+来源节点与 trigger 的合法组合：
+
+| 来源 | 允许 trigger |
+|---|---|
+| Start | `always` |
+| Task | `success`, `failure` |
+| Approval Gate | `approved`, `rejected` |
+| Question Gate | `answered` |
+| Join | `always` |
+| End | 无出边 |
 
 首版不允许用户编写表达式或脚本条件。
 
@@ -427,6 +448,8 @@ validationRule?
 
 Artifact Contract 说明交付意义，不规定本地物理路径。
 
+`validationRule` 只能引用已注册的结构化 Validator 和参数，不允许嵌入任意脚本。
+
 ---
 
 ## 9. Workflow 校验
@@ -443,11 +466,13 @@ Artifact Contract 说明交付意义，不规定本地物理路径。
 - 普通环或无上限 Rework 环
 - Join 没有足够的入边
 - Gate Action 与出边 Trigger 不匹配
+- 来源 Node 与 Transition Trigger 组合不合法
+- Gate 的 `blocking` 不是 `true`
 - Runner 无法满足 Task capability requirement
 
 警告：
 
-- 非阻塞 Gate 没有后续提醒策略
+- Gate 没有提供决策所需的上下文或 Artifact
 - Optional Task 的 Artifact 被下游作为必填输入
 - End 只有失败路径可达
 - 并行分支写入同一独占资源
@@ -481,7 +506,8 @@ Snapshot 是深拷贝业务快照。运行时不得回读 Workspace Draft 推断
 
 ```text
 runId
-snapshotId
+baseSnapshotId
+activeSnapshotId
 status
 startedAt?
 finishedAt?
@@ -490,6 +516,8 @@ resultCode?
 ```
 
 详细状态机见 [m6-run-operations.md](m6-run-operations.md)。
+
+`baseSnapshotId` 永远指向启动版本；`activeSnapshotId` 只在 Amendment 成功后前移。每个 TaskAttempt 记录自己的 `effectiveSnapshotId`，已运行部分不随 active Snapshot 变化。
 
 ### 10.3 RunAmendment
 
@@ -510,6 +538,7 @@ newSnapshotId?
 首版允许的 Amendment：
 
 - 为未开始 Task 新增 Seat 或 Task
+- 禁用尚未参与执行的 Seat；其未开始 Task 必须先重新指派或同时禁用
 - 禁用尚未开始且无下游已执行依赖的 Task
 - 修改尚未开始 Task 的 instructions 或 Runner binding
 - 调整尚未触发的 Gate
@@ -545,6 +574,7 @@ requiredRunnerCapabilities[]
 Template 不保存：
 
 - 项目绝对路径
+- 设备 Runner Profile ID；Seat/Task override 保存为能力要求，应用时重新解析
 - Runner Secret
 - 设备偏好
 - 历史 Run
@@ -585,3 +615,4 @@ Template 不保存：
 3. Canvas 拖动只改布局，调整组织归属必须使用明确命令
 4. Draft 自动保存，Run 启动时自动创建不可变 OrchestrationVersion
 5. 运行中修改通过 Amendment，只允许影响未开始部分
+6. 首版 Gate 固定为阻塞 Gate；非阻塞提醒使用 Runtime Event

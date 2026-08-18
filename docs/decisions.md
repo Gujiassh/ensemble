@@ -135,3 +135,10 @@
 - **兼容性**：不兼容旧演示 UI、API 和数据，不添加迁移或兼容层
 - **旧决策处理**：D010–D018 的具体技术硬锁仅保留为 M0–M5 历史记录；M6 可重新选择前端、Backend、编排框架、通信协议和持久化方案
 - **当前真源**：`01-product`、`08-design-language`、`ssot/design-system`、`ssot/i18n`、`ssot/platform-adaptation`、`specs/m6-product-rebuild`
+
+## D020 · M6 业务规格先行（2026-08-18）
+
+- **状态**：规格草案已落盘，产品确认待完成；不等同于技术实现硬锁
+- **新增真源**：`specs/m6-domain-model.md`、`specs/m6-orchestration-interaction.md`、`specs/m6-run-operations.md`
+- **内容**：明确 Organization 与 Workflow 分离、Workspace 创建、Runner 探测、Draft 自动保存、启动时 Snapshot、Run/Task 状态机、Attention 幂等、Artifact 版本和崩溃恢复
+- **待确认方案**：无可用 Runner 时是否阻止创建、组织拖动与层级移动分离、冲突只提供重载/模板、Pause 安全边界、下游已开始后的重跑方式、实时补充指令能力

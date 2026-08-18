@@ -57,7 +57,7 @@ Ensemble 的核心不是展示系统配置，而是让用户持续回答四个�
 
 ```text
 ┌──────┬────────────────────────────────────────────┐
-│      │ Workspace / Run / Stage / Primary action  │
+│      │ Workspace / Run / Task / Primary action   │
 │ 全局 ├───────────────────────────────────┬────────┤
 │ 导航 │                                   │        │
 │ 轨道 │          Living Org Canvas        │ 检查器 │
@@ -88,7 +88,7 @@ Ensemble 的核心不是展示系统配置，而是让用户持续回答四个�
 
 - 当前 Workspace
 - 当前 Run 或待启动任务
-- 当前阶段和整体状态
+- 当前 Task 和整体状态
 - 一个主操作
 - 必要的次级操作菜单
 
@@ -124,12 +124,13 @@ Runner 是 Workspace 创建时选择的业务配置，不是顶栏临时模式�
 2. 项目目录或仓库路径
 3. 默认 Runner
 4. Runner 所需的权限和参数确认
-5. 创建后进入空画布或选择编排模板
+5. 默认 Agent 输出语言
+6. 创建后进入空画布或选择编排模板
 
 规则：
 
-- Runner 列表只显示当前平台可用且通过检测的选项
-- 无可用 Runner 时明确说明缺少什么，不创建不可运行的 Workspace
+- 可选择列表只显示当前平台可用或完成配置后可用的 Runner；其它探测结果进入诊断区
+- 无可用 Runner 时明确说明缺少什么，并提供配置和重新探测入口
 - 修改 Workspace 默认 Runner 只影响后续 Run
 - 运行中的 Run 固定其启动时的 Runner 配置
 - Runner 技术参数进入 Workspace Settings，不占用主画布
@@ -182,7 +183,8 @@ Group 使用空间关系表达归属：
 ### 4.3 Edge
 
 - 默认低对比、细线、方向可辨
-- 只表示真实的组织或 Handoff 关系
+- 只投影真实的组织父子关系、Workflow Transition 或运行中 Handoff
+- Edge 是画布表现，不是独立业务对象；不能脱离来源关系单独保存语义
 - Hover Seat 时高亮直接相关 Edge
 - 非相关路径降低对比，但不完全消失
 - Edge 不承载大段文字
@@ -211,18 +213,18 @@ Handoff 使用短暂、明确、有方向的脉冲：
 
 | 视觉语义 | 内部状态 | 默认表达 |
 |---------|----------|---------|
-| 就绪 | `idle` | 中性轮廓 |
-| 执行中 | `planning`, `working`, `tooling` | 活跃状态 + 具体动作 |
-| 等待 | `waiting_human`, `waiting_peer` | 等待标记 + 等待对象 |
-| 异常 | `blocked`, `error` | 危险标记 + 原因入口 |
-| 完成 | `done` | 完成标记，降低持续强调 |
+| 就绪 | `created`, `pending`, `ready` | 中性轮廓 |
+| 执行中 | `preparing`, `starting`, `running`, `pausing`, `canceling` | 活跃状态 + 具体动作 |
+| 等待 | `paused`, `waiting_attention` | 等待标记；需用户处理时叠加主信号 |
+| 异常 | `blocked`, `failed`, `interrupted`, `degraded` | 危险标记 + 原因入口 |
+| 终态 | `succeeded`, `canceled`, `skipped` | 成功使用完成标记，取消和跳过使用中性终态 |
 
 颜色只能辅助语义，图标、文案和结构必须能独立表达状态。
 
 ### 5.1 优先级
 
 ```text
-需要用户处理 > 异常 > 执行中 > 普通等待 > 完成 > 就绪
+需要用户处理 > 异常 > 执行中 > 普通等待 > 成功 > 取消或跳过 > 就绪
 ```
 
 折叠 Group 或父 Seat 必须汇总子树中的 Attention 和异常，不让关键状态因折叠消失。

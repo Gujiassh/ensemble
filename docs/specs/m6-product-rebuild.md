@@ -1,7 +1,7 @@
 # M6 Spec — Product Rebuild
 
-**状态**：Ready for architecture and implementation planning  
-**真源**：[../01-product.md](../01-product.md) · [../08-design-language.md](../08-design-language.md) · [../ssot/design-system.md](../ssot/design-system.md) · [../ssot/i18n.md](../ssot/i18n.md) · [../ssot/platform-adaptation.md](../ssot/platform-adaptation.md)
+**状态**：Draft v1，产品交互确认后进入架构与实现规划
+**真源**：[../01-product.md](../01-product.md) · [../08-design-language.md](../08-design-language.md) · [../ssot/design-system.md](../ssot/design-system.md) · [../ssot/i18n.md](../ssot/i18n.md) · [../ssot/platform-adaptation.md](../ssot/platform-adaptation.md) · [m6-domain-model.md](m6-domain-model.md) · [m6-orchestration-interaction.md](m6-orchestration-interaction.md) · [m6-run-operations.md](m6-run-operations.md)
 
 ## 1. 目标
 
@@ -71,7 +71,7 @@ src-tauri/
 |------|--------|----------|
 | Theme、UI Locale、Density | Tauri preferences | 设备级 |
 | Workspace path、默认 Runner、默认输出语言 | Workspace config | Workspace 级 |
-| Role、Seat、Group、Edge、Stage、Gate | Orchestration config | 可编辑模板 |
+| Role、Seat、Group、Task、Transition、Gate、Join、Contract | Orchestration config | 可编辑模板 |
 | Runner、Prompt、编排版本、输出语言 | Run snapshot | Run 启动时冻结 |
 | Status、Handoff、Attention | Runtime events | Run 运行时 |
 | Artifact | Runtime persistence | Run 级 |
@@ -103,7 +103,7 @@ src-tauri/
 
 1. 从单 Agent 或模板开始
 2. 编辑 Role、Seat 和 Group
-3. 定义 Handoff、阶段和 Attention Gate
+3. 定义 Task、Transition、Artifact Contract 和 Attention Gate
 4. 校验输入、输出和依赖
 5. 保存编排版本
 
@@ -171,6 +171,8 @@ Windows、macOS、Linux 分别提供：
 6. Theme token implementation contract
 7. i18n key and message protocol
 8. Windows、macOS、Linux CI 构建方案
+9. Workspace 创建、编排编辑、自动保存和冲突交互规格
+10. Run、Attention、Artifact、暂停取消和恢复规格
 
 完成上述设计后再拆分实际开发任务。
 
@@ -187,4 +189,17 @@ Windows、macOS、Linux 分别提供：
 - Runner 是否仍可替换
 - Run 启动后配置是否稳定
 - 业务状态是否通过稳定 code 传递
+- Pause、Cancel、Retry、Rework 和 Resume 是否遵循状态机且可幂等重放
+- Run 是否只读取不可变 Snapshot，事件缺口是否能通过对账恢复
 - 是否有对应平台和用户流程的运行证据
+
+## 11. 产品确认门禁
+
+以下六组决定关闭后，M6 才进入架构与实现任务拆分：
+
+1. **Runner 选择**：Workspace 创建至少需要一个可用 Profile；`pi` 为默认推荐，Task/Seat 覆盖属于高级配置，默认 Runner 的生产分发不得要求用户另装 Node。
+2. **Workflow 能力**：首版支持 Task、Gate、Join、并行、`all/any` 和有上限 Rework，不支持任意脚本或自由表达式；Gate 首版固定阻塞。
+3. **画布与保存**：画布拖动只改布局，层级移动使用明确命令；Draft 自动保存，冲突不静默合并，启动 Run 创建不可变版本。
+4. **运行快照**：Run 只读 Snapshot；Amendment 只能追加 Snapshot 后代并影响未开始部分，不能改历史 Task、Artifact 或 Gate。
+5. **运行控制**：Pause 停止新派发并按 Runner 能力到安全边界；Cancel 不可逆；下游已开始后的重跑创建新 Run，不回滚原 Run。
+6. **人工介入与恢复**：实时补充指令需要 Runner capability，否则进入下一次 Attempt；Attention 幂等；崩溃通过事件对账和 recovery Attempt 恢复。
