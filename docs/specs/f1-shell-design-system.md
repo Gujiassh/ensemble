@@ -179,7 +179,8 @@ Required semantic tokens:
 --color-surface-raised
 --color-text-primary
 --color-text-secondary
---color-text-inverse
+--color-text-navigation
+--color-text-on-primary
 --color-border-subtle
 --color-border-strong
 --color-action-primary
@@ -218,9 +219,9 @@ Implement `light`, `dark`, and `system` as resolver values. `system` follows the
 | Primary text | `#17191C` |
 | Secondary text | `#676E76` |
 | Subtle border | `#D9DEE3` |
-| Primary signal | `#E94B35` |
+| Primary signal | `#C93626` |
 | Active work | `#2F6FDB` |
-| Waiting | `#B97816` |
+| Waiting | `#95600C` |
 | Danger | `#C33F39` |
 | Success | `#287658` |
 
@@ -275,7 +276,7 @@ The inspector is a conditional fourth surface. It must not reserve width when cl
 
 Target values:
 
-- Navigation rail: `56px` default, `64px` expanded.
+- Navigation rail: `56px` default, temporary `208px` overlay when expanded.
 - Context bar: `52px` target.
 - Inspector: `320px` target, `360px` maximum.
 - Base spacing: multiples of `4px`.
@@ -387,14 +388,30 @@ type WorkspaceCreateInput = {
   defaultOutputLocale: "zh-CN" | "en-US";
 };
 
+type WorkspaceSummary = WorkspaceCreateInput & {
+  id: string;
+};
+
 type WorkspaceGateway = {
   getConnectionState(): Promise<ConnectionState>;
-  listRunnerProfiles(): Promise<RunnerProbeResult[]>;
-  selectProjectDirectory(): Promise<string | null>;
-  createWorkspace(input: WorkspaceCreateInput): Promise<
+  listWorkspaces(): Promise<WorkspaceSummary[]>;
+  probeRunnerProfiles(
+    onResult: (result: RunnerProbeResult) => void,
+    options?: { signal?: AbortSignal },
+  ): Promise<void>;
+  selectProjectDirectory(options?: { signal?: AbortSignal }): Promise<
+    | { ok: true; path: string }
+    | { ok: false; code: string; messageKey: string }
+  >;
+  createWorkspace(
+    input: WorkspaceCreateInput,
+    options?: { signal?: AbortSignal },
+  ): Promise<
     | { ok: true; workspaceId: string }
     | { ok: false; code: string; messageKey: string }
   >;
+  openDiagnostics?(): Promise<void>;
+  quit?(): Promise<void>;
 };
 ```
 
@@ -496,7 +513,34 @@ Tasks are intentionally ordered. A task is not complete until its code, test, an
 | F1-19 | Wire desktop startup and shutdown | F1-16 through F1-18 | Bundled frontend follows the root state machine, owns only its Runtime process, and exits without stale child processes |
 | F1-20 | Complete F1-B desktop review | F1-19 | Tauri build/check, bundled-asset startup, failure/retry, preference path, directory picker, and shutdown evidence are recorded |
 
-### 12.1 File ownership for implementation
+### 12.1 Implementation status
+
+This table is the delivery ledger for the current F1 implementation. “Complete” means the client-side code, focused tests, and required evidence exist. It does not imply that the blocked desktop/backend work is available.
+
+| ID | Status | Evidence |
+|---|---|---|
+| F1-01 | complete | Prototype entry and fixture modules removed; production boundary test passes |
+| F1-02 | complete | Typed lifecycle model, legal transition guard, root-state tests, and AppShell lifecycle tests |
+| F1-03 | complete | Semantic token resolver, light/dark themes, forced contrast/motion handling, raw-color scan, and WCAG contrast tests |
+| F1-04 | complete | Button, IconButton, TextField, Select, SegmentedControl, Dialog, StatusMark, and Notice primitives; Dialog and IME tests |
+| F1-05 | complete | `zh-CN`/`en-US` catalog coverage, pseudo-locale helper, and `Intl` formatter tests |
+| F1-06 | complete | Device-only schema, serialized preference writes, reset, rapid-update, and payload rejection tests |
+| F1-07 | complete | [1024 empty](evidence/f1-a/no-workspace-zh-light-1024.png), [1280 overlay](evidence/f1-a/inspector-overlay-en-dark-1280.png), and [1440 docked](evidence/f1-a/inspector-docked-zh-light-1440.png) screenshots |
+| F1-08 | complete | Typed Canvas viewport states, injected projection harness, and [ready Canvas](evidence/f1-a/workspace-created-en-light-1280.png) screenshot |
+| F1-09 | complete | Inspector selection/focus tests and overlay/docked screenshots |
+| F1-10 | complete | Four-step create flow, validation, dirty-close, failed-create preservation, and [failure screenshot](evidence/f1-a/workspace-create-failure-en-light-1280.png) |
+| F1-11 | complete | Incremental probe ordering, partial completion, availability gating, and no-secret rendering tests |
+| F1-12 | complete | Production unavailable gateway, injected test gateway, cancellable operations, and entry-boundary test |
+| F1-13 | complete | Preference provider tests plus [live settings switch](evidence/f1-a/settings-zh-dark-compact-1280.png) |
+| F1-14 | complete | Playwright keyboard/focus smoke, reduced-motion runs, forced-colors styling, contrast tests, both locales, and 1024/1280/1440 screenshots |
+| F1-15 | complete | [F1-A implementation audit](reviews/F1-A-implementation-review-2026-08-18.md), final diff review, command matrix, and browser evidence |
+| F1-16 | blocked | Requires F0-selected platform preference location and desktop adapter |
+| F1-17 | blocked | Requires F0-selected native directory picker capability |
+| F1-18 | blocked | Requires F0-selected authenticated Runtime transport |
+| F1-19 | blocked | Requires F1-16 through F1-18 |
+| F1-20 | blocked | Requires F1-B implementation and real Windows/macOS/Linux package evidence |
+
+### 12.2 File ownership for implementation
 
 The F1-A implementation lane owns:
 

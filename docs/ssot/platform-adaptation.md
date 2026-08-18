@@ -1,6 +1,6 @@
 # Platform Adaptation SSoT
 
-**状态**：已确认，待实现（2026-08-18）
+**状态**：已确认；桌面绑定与打包仍等待 F0 Backend 形态决策（2026-08-18）
 **首发平台**：Windows、macOS、Linux
 **Web**：仅开发和自动化验证，不作为首发产品
 **实施 Spike**：[m6-platform-packaging.md](../specs/m6-platform-packaging.md)

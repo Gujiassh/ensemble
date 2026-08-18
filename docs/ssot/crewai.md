@@ -1,9 +1,9 @@
 # SSoT · CrewAI（AI 编排框架）
 
-**状态**：V2 运行时约束（2026-08-18）
-**说明**：多角色编排使用 CrewAI 做只读投影；CrewAI 不拥有组织模型，也不替代 Runner。
-**范围**：`services/runtime` 内多角色协作语义  
-**非范围**：Living Org Canvas UI、Org tree 写路径、Runner 协议本身  
+**状态**：历史运行时约束，已被 D019/M6 架构评估取代（2026-08-18）
+**说明**：本文件记录早期 CrewAI 只读投影方案，不是当前 Backend 或前端实现合同。
+**范围**：历史 `services/runtime` 多角色协作方案
+**非范围**：当前 Canvas 工作台、Workspace 写路径、Runner 协议本身
 
 ---
 
@@ -12,7 +12,7 @@
 | 项 | 值 |
 |----|-----|
 | **AI 框架** | **CrewAI**（Python 包 `crewai`） |
-| 产品门面 | Living Org Canvas（**不是** CrewAI 自带 UI） |
+| 产品门面 | Canvas 工作台（**不是** CrewAI 自带 UI） |
 | 编制 SSoT | Org tree（`tree.json` + `edges[]`） |
 | CrewAI 角色 | **只读投影** + 任务协作执行引擎 |
 | 编码执行 | Runner（默认 `pi`）；CrewAI 不替代 Runner |

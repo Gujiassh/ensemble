@@ -1,19 +1,26 @@
-import { OrgCanvas } from "./canvas/OrgCanvas";
-import { DossierDrawer } from "./dossier/DossierDrawer";
-import { TopBar } from "./app/TopBar";
-import { TodoTray } from "./app/TodoTray";
+import { AppShell } from "./app-shell/AppShell";
+import { I18nProvider } from "./i18n/I18nProvider";
+import { createLocalStoragePreferenceAdapter } from "./preferences/adapter";
+import { PreferenceProvider } from "./preferences/PreferenceProvider";
+import { createUnavailableGateway } from "./workspace/gateway";
+
+/**
+ * Production entry.
+ * Preference adapter: localStorage until F1-B binds the platform config directory.
+ * Gateway: explicit unavailable implementation until Runtime is injected by F1-B.
+ * Test/demo adapters must never be selected here.
+ */
+const preferenceAdapter = createLocalStoragePreferenceAdapter();
+const gateway = createUnavailableGateway();
 
 export default function App() {
   return (
-    <div className="app-shell">
-      <TopBar />
-      <div className="main-row">
-        <TodoTray />
-        <div className="canvas-wrap">
-          <OrgCanvas />
-        </div>
-        <DossierDrawer />
-      </div>
+    <div className="app-root">
+      <PreferenceProvider adapter={preferenceAdapter}>
+        <I18nProvider>
+          <AppShell gateway={gateway} />
+        </I18nProvider>
+      </PreferenceProvider>
     </div>
   );
 }

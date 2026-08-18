@@ -1,4 +1,6 @@
-# 参考与竞品
+# 参考与竞品（历史参考）
+
+> 本文用于记录早期竞品研究，不是当前产品术语或架构约束。当前设计语言见 [08-design-language.md](08-design-language.md)，当前架构见 [specs/m6-architecture.md](specs/m6-architecture.md)。
 
 ## 定位空白
 
@@ -10,7 +12,7 @@
 
 Ensemble 叠加为：
 
-> **Living Org Canvas（组织/OA/冒泡）× 管道传信 × Runner 可插拔 × Staffing 可挂树**
+> 画布工作台（组织/OA/人工介入）× Handoff × Runner 可插拔 × 可复用编排
 
 ## 角色 / 虚拟软件公司
 
@@ -52,6 +54,6 @@ Ensemble 叠加为：
 
 ## 对标话术（内部 · 现行）
 
-> 有角色剧本的 Conductor，有组织在场感的 ChatDev，有可插拔 runner 的 **Living Org Canvas** —— 品牌是 Ensemble。  
+> 有角色剧本的 Conductor，有可操作画布的 Agent 工作台，有可插拔 Runner —— 品牌是 Ensemble。
 
 （旧句「stageboard / 交付物墙」已退役。）  

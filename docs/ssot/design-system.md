@@ -1,6 +1,6 @@
 # Design System SSoT
 
-**状态**：V2 已确认，待实现（2026-08-18）  
+**状态**：V2 已确认；F1-A 语义 Token 与基础控件已实现，F1-B 平台绑定待 Backend 决策（2026-08-18）
 **配合**：[../08-design-language.md](../08-design-language.md) · [i18n.md](i18n.md) · [platform-adaptation.md](platform-adaptation.md)
 
 ## 1. 目标
@@ -71,7 +71,8 @@ duration.fast
 --color-surface-raised;
 --color-text-primary;
 --color-text-secondary;
---color-text-inverse;
+--color-text-navigation;
+--color-text-on-primary;
 --color-border-subtle;
 --color-border-strong;
 --color-action-primary;
@@ -114,9 +115,9 @@ duration.fast
 | Primary text | `#17191C` |
 | Secondary text | `#676E76` |
 | Subtle border | `#D9DEE3` |
-| Primary action / user attention | `#E94B35` |
+| Primary action / user attention | `#C93626` |
 | Active system work | `#2F6FDB` |
-| Waiting | `#B97816` |
+| Waiting | `#95600C` |
 | Danger | `#C33F39` |
 | Success | `#287658` |
 
@@ -143,7 +144,7 @@ duration.fast
   "tokens": {
     "color.canvas.background": "#F7F8F9",
     "color.text.primary": "#17191C",
-    "color.action.primary": "#E94B35"
+    "color.action.primary": "#C93626"
   }
 }
 ```

@@ -20,6 +20,8 @@
 | [reviews/M6-business-spec-2026-08-18.md](reviews/M6-business-spec-2026-08-18.md) | M6 业务规格审查 | **CURRENT · PASS with implementation blocked** |
 | [reviews/M6-architecture-plan-2026-08-18.md](reviews/M6-architecture-plan-2026-08-18.md) | M6 架构与开发计划审查 | **CURRENT · ACCEPT with Spike gate** |
 | [reviews/F1-spec-review-2026-08-18.md](reviews/F1-spec-review-2026-08-18.md) | F1 实施规格审查 | **CURRENT · ACCEPT for F1-A** |
+| [reviews/F1-A-implementation-review-2026-08-18.md](reviews/F1-A-implementation-review-2026-08-18.md) | F1-A 客户端实现审计 | **CURRENT · ACCEPT; F1-B blocked by F0** |
+| [evidence/f1-a/](evidence/f1-a/) | F1-A 浏览器与布局证据 | **CURRENT** |
 | `reviews/` | 其它审计报告落盘 | 按需创建 |
 
 **规则**：M1–M5 仅保留为原型历史；新实现以 M6 业务、架构、协议、Runner、平台规格和 V2 SSoT 为准。
