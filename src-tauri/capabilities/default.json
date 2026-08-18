@@ -1,0 +1,9 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Minimal M4 shell capability — core only; no fs/shell plugins. Runtime spawn uses Rust std::process.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default"
+  ]
+}
