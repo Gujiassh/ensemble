@@ -1,68 +1,49 @@
 # Ensemble
 
-**Orchestrate agents with clarity and control.**
+> A local-first desktop workspace for orchestrating coding agents.
 
-Ensemble 是一款跨平台、本地优先的 Agent 编排桌面应用。用户创建 Workspace 时选择适合项目的 Runner，通过组织画布定义角色、任务依赖、交付和人机门禁，并在运行过程中观察、审批、打回、补充指令或重试。
+Ensemble gives developers and technical leads one calm place to design, run, and supervise agent workflows. Define roles, tasks, handoffs, approvals, and deliverables on an organization canvas, then step in when human judgment is needed.
 
-## 当前状态
+## Why Ensemble
 
-- **产品目标**：V2 已确认
-- **设计语言**：V2 已确认，待全量重做
-- **实现状态**：M0–M5 原型仅作功能参考，不是新产品基线
-- **兼容要求**：不兼容旧演示 UI、API 和数据
-- **当前阶段**：M6 架构与产品重建
+Working with multiple coding agents often means switching between terminals, chat windows, and scattered output files. Ensemble keeps the workflow, live run state, and resulting artifacts together while keeping people in control of important decisions.
 
-现有 `apps/canvas`、`services/runtime` 和 `src-tauri` 可以删除或替换。任何新实现都以 M6 文档为准。
+## Core capabilities
 
-## 产品基线
+- Start with a single agent or compose a multi-agent workflow.
+- Create a workspace around a project directory and choose its default Runner. `pi` is the default Runner, while the adapter remains replaceable.
+- Model roles, seats, groups, tasks, dependencies, handoffs, deliverables, and approval gates.
+- Observe live runs and intervene with approvals, instructions, pause, cancel, retry, or rework actions.
+- Inspect artifacts such as files, diffs, reports, and structured results in the context of the run that produced them.
+- Work locally by default, without requiring an account or cloud sync for the first release.
+- Use light, dark, system, or custom themes, with `en-US` and `zh-CN` as the first locales. The interface language and agent output language are configured independently.
+- Target Windows, macOS, and Linux with a bundled runtime rather than a user-managed Python or Node installation.
 
-- 单 Agent 和多 Agent 都是完整路径
-- Workspace 创建时选择默认 Runner
-- Runner 保持可替换
-- 画布是主工作区
-- Seat 去卡片化
-- Handoff 使用短暂、有方向的脉冲
-- 左侧窄导航，检查器按需出现
-- 浅色优先，支持深色、系统和自定义主题协议
-- `zh-CN`、`en-US` 首发，UI Locale 与 Agent 输出语言分离
-- Windows、macOS、Linux 独立安装运行
-- 用户不需要安装额外开发环境
-- 首版本地优先，不做账户和云同步
+## Designed for
 
-## 文档真源
+- **Independent developers** who want one or more agents to take on issues, features, and fixes.
+- **Technical leads** who need a clear view of responsibility, progress, dependencies, and human approval points.
+- **Agent builders** who want to assemble reusable workflows from roles, Runner adapters, and execution rules.
 
-| 文档 | 内容 |
-|------|------|
-| [docs/01-product.md](docs/01-product.md) | 产品目标、用户和边界 |
-| [docs/02-brand.md](docs/02-brand.md) | 品牌与用语 |
-| [docs/08-design-language.md](docs/08-design-language.md) | 新设计语言与交互原则 |
-| [docs/ssot/design-system.md](docs/ssot/design-system.md) | Theme、Token、Density、Motion |
-| [docs/ssot/i18n.md](docs/ssot/i18n.md) | UI Locale 与 Agent 输出语言 |
-| [docs/ssot/platform-adaptation.md](docs/ssot/platform-adaptation.md) | Windows、macOS、Linux 交付要求 |
-| [docs/specs/m6-product-rebuild.md](docs/specs/m6-product-rebuild.md) | M6 重建范围和验收 |
-| [docs/specs/m6-domain-model.md](docs/specs/m6-domain-model.md) | Organization、Workflow、Snapshot 和 RuntimeState 领域边界 |
-| [docs/specs/m6-orchestration-interaction.md](docs/specs/m6-orchestration-interaction.md) | Workspace 创建、编排编辑、保存、校验和启动交互 |
-| [docs/specs/m6-run-operations.md](docs/specs/m6-run-operations.md) | Run 状态机、人工介入、Artifact、事件对账和恢复 |
-| [docs/decisions.md](docs/decisions.md) | 决策记录 |
+Ensemble is focused on coding-agent orchestration. It is not intended to be a general-purpose workflow builder, a customer-support platform, or an IDE replacement.
 
-旧的 M0–M5 技术、协议和实现文档保留为历史证据；若与上表冲突，以 V2/M6 文档为准。
+## Project status
 
-## 原型运行
+Ensemble is early-stage open-source software. The product direction is established, but the desktop runtime, API, and user experience are still being rebuilt. Interfaces and behavior may change, and there is no packaged public release yet.
 
-下面命令只用于查看旧原型，不代表新产品架构：
+## Documentation
 
-```bash
-cd /home/cc/code1/ensemble
-pnpm install
-pnpm dev:canvas
-```
+- [Product goals and scope](docs/01-product.md)
+- [Design language and interaction model](docs/08-design-language.md)
+- [Design system source of truth](docs/ssot/design-system.md)
+- [Internationalization](docs/ssot/i18n.md)
+- [Cross-platform delivery requirements](docs/ssot/platform-adaptation.md)
+- [Product rebuild specification](docs/specs/m6-product-rebuild.md)
 
-浏览器地址：`http://127.0.0.1:17351`
+## Contributing
 
-## 下一步
+Contributions are welcome. For a substantial change, open an issue first so the product behavior and API boundaries can be discussed before implementation.
 
-1. 完成 M6 领域、交互和运行期规格确认
-2. 评估跨平台 Backend 形态
-3. 定义 Workspace、Orchestration、Run、Event 和 Runner Adapter 合约
-4. 完成 Canvas 信息架构线框
-5. 再进入前后端实现
+## License
+
+Ensemble is released under the [MIT License](LICENSE).
