@@ -2,7 +2,7 @@
   "name": "ensemble",
   "private": true,
   "version": "0.1.0",
-  "description": "Local-first desktop workspace for orchestrating coding agents",
+  "description": "Desktop workspace for orchestrating coding agents",
   "scripts": {
     "dev:canvas": "pnpm --filter @ensemble/canvas dev",
     "build:canvas": "pnpm --filter @ensemble/canvas build",

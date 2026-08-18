@@ -1,23 +1,29 @@
 # Ensemble
 
-> A local-first desktop workspace for orchestrating coding agents.
+> Plan, coordinate, and review coding-agent work from one focused desktop workspace.
 
-Ensemble gives developers and technical leads one calm place to design, run, and supervise agent workflows. Define roles, tasks, handoffs, approvals, and deliverables on an organization canvas, then step in when human judgment is needed.
+Ensemble turns agent work into a visible, controllable workflow. Arrange roles and tasks on an organization canvas, define how work moves, and follow each run from assignment to artifact. Keep human approval where it matters without losing momentum.
 
 ## Why Ensemble
 
-Working with multiple coding agents often means switching between terminals, chat windows, and scattered output files. Ensemble keeps the workflow, live run state, and resulting artifacts together while keeping people in control of important decisions.
+Coding-agent work is easy to scatter across terminals, chat threads, and output folders. Ensemble brings ownership, dependencies, handoffs, decisions, and deliverables into one operating view so people can understand the work and change its direction when needed.
+
+## How it works
+
+1. **Create a workspace** around a project directory and choose the execution engine that fits it. `pi` is the default Runner, and Runner adapters remain replaceable.
+2. **Compose an orchestration** from roles, seats, groups, tasks, dependencies, handoffs, deliverables, and approval gates.
+3. **Run and supervise** the workflow. Follow progress, inspect artifacts, approve results, add instructions, pause, cancel, retry, or rework tasks.
 
 ## Core capabilities
 
 - Start with a single agent or compose a multi-agent workflow.
-- Create a workspace around a project directory and choose its default Runner. `pi` is the default Runner, while the adapter remains replaceable.
-- Model roles, seats, groups, tasks, dependencies, handoffs, deliverables, and approval gates.
-- Observe live runs and intervene with approvals, instructions, pause, cancel, retry, or rework actions.
-- Inspect artifacts such as files, diffs, reports, and structured results in the context of the run that produced them.
-- Work locally by default, without requiring an account or cloud sync for the first release.
-- Use light, dark, system, or custom themes, with `en-US` and `zh-CN` as the first locales. The interface language and agent output language are configured independently.
-- Target Windows, macOS, and Linux with a bundled runtime rather than a user-managed Python or Node installation.
+- Make responsibility and execution order explicit.
+- Track live run state, human attention points, handoffs, and artifacts in context.
+- Keep files, diffs, reports, and structured results attached to the run that produced them.
+- Save and reuse workflow configurations across workspaces.
+- Use light, dark, system, or custom themes without changing the meaning of a status.
+- Configure the interface language and agent output language independently. The interface supports multiple locales, including `en-US` and `zh-CN`.
+- Run as a standalone desktop application on Windows, macOS, and Linux.
 
 ## Designed for
 
@@ -25,20 +31,15 @@ Working with multiple coding agents often means switching between terminals, cha
 - **Technical leads** who need a clear view of responsibility, progress, dependencies, and human approval points.
 - **Agent builders** who want to assemble reusable workflows from roles, Runner adapters, and execution rules.
 
-Ensemble is focused on coding-agent orchestration. It is not intended to be a general-purpose workflow builder, a customer-support platform, or an IDE replacement.
-
-## Project status
-
-Ensemble is early-stage open-source software. The product direction is established, but the desktop runtime, API, and user experience are still being rebuilt. Interfaces and behavior may change, and there is no packaged public release yet.
+Ensemble is focused on coding-agent orchestration. It is not a general-purpose workflow builder, a customer-support platform, or an IDE replacement.
 
 ## Documentation
 
-- [Product goals and scope](docs/01-product.md)
+- [Product definition](docs/01-product.md)
 - [Design language and interaction model](docs/08-design-language.md)
-- [Design system source of truth](docs/ssot/design-system.md)
-- [Internationalization](docs/ssot/i18n.md)
-- [Cross-platform delivery requirements](docs/ssot/platform-adaptation.md)
-- [Product rebuild specification](docs/specs/m6-product-rebuild.md)
+- [Design system](docs/ssot/design-system.md)
+- [Languages and internationalization](docs/ssot/i18n.md)
+- [Desktop platform requirements](docs/ssot/platform-adaptation.md)
 
 ## Contributing
 
