@@ -142,3 +142,17 @@
 - **新增真源**：`specs/m6-domain-model.md`、`specs/m6-orchestration-interaction.md`、`specs/m6-run-operations.md`
 - **内容**：明确 Organization 与 Workflow 分离、Workspace 创建、Runner 探测、Draft 自动保存、启动时 Snapshot、Run/Task 状态机、Attention 幂等、Artifact 版本和崩溃恢复
 - **待确认方案**：无可用 Runner 时是否阻止创建、组织拖动与层级移动分离、冲突只提供重载/模板、Pause 安全边界、下游已开始后的重跑方式、实时补充指令能力
+
+## D021 · V2 实施先完成架构与交付契约（2026-08-18）
+
+- **决定**：V2 不沿用 M0–M5 的实现顺序；先完成架构边界、Runner Adapter、Event/Command、Backend 进程形态和跨平台打包 Spike，再进入新桌面壳和业务实现。
+- **原因**：Backend 进程形态会影响启动、认证、数据目录、Runner 分发和退出恢复；协议未冻结前实现 UI 会产生第二套状态和兼容结构。
+- **当前真源**：`specs/m6-architecture.md`、`specs/m6-runner-adapter.md`、`specs/m6-events-commands.md`、`specs/m6-platform-packaging.md`、`12-dev-plan.md`。
+- **约束**：旧 `03`、`06`、`09`、`10`、`11` 和 M1–M5 specs 只作为历史参考，不得作为新代码的契约来源。
+
+## D022 · CrewAI 保持多角色运行时约束（2026-08-18）
+
+- **决定**：V2 多角色编排继续使用 CrewAI；CrewAI 只负责从组织与 Workflow 投影协作语义，不拥有 Org/Workflow 写路径，也不替代 Runner。
+- **原因**：多角色协作需要稳定的 Agent、Task、Crew 投影语义，同时必须保持编码执行引擎可替换。
+- **范围**：单 Agent 可以不实例化完整 Crew；多角色 Run 必须保留 CrewAI 投影路径。`pi` 仍是默认 Runner。
+- **覆盖**：本条覆盖 D019 中“可以移除 CrewAI”的开放项；其它前端、Backend 进程形态、协议和存储选择仍按 M6 Spike 决定。

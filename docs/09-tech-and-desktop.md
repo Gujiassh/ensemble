@@ -1,8 +1,8 @@
-# 技术选型与桌面壳
+# [归档] 技术选型与桌面壳
 
 **状态**：M0–M5 历史选型，已被 D019 解除锁定  
 **产品**：Ensemble  
-**说明**：本文件不再约束 M6。跨平台交付要求见 [ssot/platform-adaptation.md](ssot/platform-adaptation.md)，新技术选型在 M6 架构评估后重写。
+**说明**：本文件记录 M0–M5 的历史选型，不再约束 V2。当前架构见 [specs/m6-architecture.md](specs/m6-architecture.md)，Runner 见 [specs/m6-runner-adapter.md](specs/m6-runner-adapter.md)，平台 Spike 见 [specs/m6-platform-packaging.md](specs/m6-platform-packaging.md)。
 
 ---
 

@@ -73,5 +73,10 @@ M0–M5 原型验证过部分功能概念，但其前端、Backend、协议和�
 7. [specs/m6-domain-model.md](specs/m6-domain-model.md)
 8. [specs/m6-orchestration-interaction.md](specs/m6-orchestration-interaction.md)
 9. [specs/m6-run-operations.md](specs/m6-run-operations.md)
+10. [specs/m6-architecture.md](specs/m6-architecture.md)
+11. [specs/m6-runner-adapter.md](specs/m6-runner-adapter.md)
+12. [specs/m6-events-commands.md](specs/m6-events-commands.md)
+13. [specs/m6-platform-packaging.md](specs/m6-platform-packaging.md)
+14. [12-dev-plan.md](12-dev-plan.md)
 
-旧的 `03`、`06`、`09`、`10`、`11`、`12` 和 M1–M5 Specs 在 M6 完成新架构决策前仅作历史参考。
+`03`、`06`、`09`、`10`、`11` 和 M1–M5 Specs 只保留为历史参考；V2 实施以以上产品、架构、协议、平台和开发计划为准。

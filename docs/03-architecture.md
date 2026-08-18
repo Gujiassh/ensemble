@@ -1,7 +1,7 @@
-# 架构：壳 / 画布 / 运行时 / 执行
+# [归档] 架构：壳 / 画布 / 运行时 / 执行
 
 **状态**：M0–M5 历史架构，已被 D019 解除锁定  
-**说明**：本文件只记录旧原型结构。M6 可以重做前端、Backend、协议、持久化和技术选型；当前入口见 [specs/m6-product-rebuild.md](specs/m6-product-rebuild.md)。
+**说明**：本文件只记录旧原型结构。V2 当前架构入口见 [specs/m6-architecture.md](specs/m6-architecture.md)；Runner 见 [specs/m6-runner-adapter.md](specs/m6-runner-adapter.md)。
 
 ---
 

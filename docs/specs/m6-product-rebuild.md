@@ -1,7 +1,7 @@
 # M6 Spec — Product Rebuild
 
-**状态**：Draft v1，产品交互确认后进入架构与实现规划
-**真源**：[../01-product.md](../01-product.md) · [../08-design-language.md](../08-design-language.md) · [../ssot/design-system.md](../ssot/design-system.md) · [../ssot/i18n.md](../ssot/i18n.md) · [../ssot/platform-adaptation.md](../ssot/platform-adaptation.md) · [m6-domain-model.md](m6-domain-model.md) · [m6-orchestration-interaction.md](m6-orchestration-interaction.md) · [m6-run-operations.md](m6-run-operations.md)
+**状态**：实施基线 v1（2026-08-18）
+**真源**：[../01-product.md](../01-product.md) · [../08-design-language.md](../08-design-language.md) · [../ssot/design-system.md](../ssot/design-system.md) · [../ssot/i18n.md](../ssot/i18n.md) · [../ssot/platform-adaptation.md](../ssot/platform-adaptation.md) · [m6-domain-model.md](m6-domain-model.md) · [m6-orchestration-interaction.md](m6-orchestration-interaction.md) · [m6-run-operations.md](m6-run-operations.md) · [m6-architecture.md](m6-architecture.md) · [m6-runner-adapter.md](m6-runner-adapter.md) · [m6-events-commands.md](m6-events-commands.md) · [m6-platform-packaging.md](m6-platform-packaging.md)
 
 ## 1. 目标
 
@@ -193,9 +193,9 @@ Windows、macOS、Linux 分别提供：
 - Run 是否只读取不可变 Snapshot，事件缺口是否能通过对账恢复
 - 是否有对应平台和用户流程的运行证据
 
-## 11. 产品确认门禁
+## 11. 已确认的实施门禁
 
-以下六组决定关闭后，M6 才进入架构与实现任务拆分：
+以下六组规则作为 M6 实现约束；Backend 进程形态仍由 [m6-platform-packaging.md](m6-platform-packaging.md) Spike 决定：
 
 1. **Runner 选择**：Workspace 创建至少需要一个可用 Profile；`pi` 为默认推荐，Task/Seat 覆盖属于高级配置，默认 Runner 的生产分发不得要求用户另装 Node。
 2. **Workflow 能力**：首版支持 Task、Gate、Join、并行、`all/any` 和有上限 Rework，不支持任意脚本或自由表达式；Gate 首版固定阻塞。
@@ -203,3 +203,5 @@ Windows、macOS、Linux 分别提供：
 4. **运行快照**：Run 只读 Snapshot；Amendment 只能追加 Snapshot 后代并影响未开始部分，不能改历史 Task、Artifact 或 Gate。
 5. **运行控制**：Pause 停止新派发并按 Runner 能力到安全边界；Cancel 不可逆；下游已开始后的重跑创建新 Run，不回滚原 Run。
 6. **人工介入与恢复**：实时补充指令需要 Runner capability，否则进入下一次 Attempt；Attention 幂等；崩溃通过事件对账和 recovery Attempt 恢复。
+
+实现不得用旧 M0–M5 的 Stage、Edge、Bubble 或命令语义替代以上规则。

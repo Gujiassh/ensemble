@@ -1,8 +1,9 @@
 # Platform Adaptation SSoT
 
-**状态**：已确认，待实现（2026-08-18）  
-**首发平台**：Windows、macOS、Linux  
+**状态**：已确认，待实现（2026-08-18）
+**首发平台**：Windows、macOS、Linux
 **Web**：仅开发和自动化验证，不作为首发产品
+**实施 Spike**：[m6-platform-packaging.md](../specs/m6-platform-packaging.md)
 
 ## 1. 交付目标
 
@@ -27,7 +28,7 @@
 - 将核心 Backend 放入 Tauri/Rust 进程
 - 随安装包交付按目标平台构建的独立 sidecar
 
-最终选型由 M6 架构评估决定。无论采用哪一种，都必须满足：
+最终选型由 M6 Backend/打包 Spike 决定。无论采用哪一种，都必须满足：
 
 要求：
 

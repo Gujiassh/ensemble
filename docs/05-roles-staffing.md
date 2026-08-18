@@ -1,6 +1,6 @@
 # 角色契约与自动扩编（Staffing）
 
-**配合**：[08-design-language](08-design-language.md) · [03-architecture](03-architecture.md) · [10-events-schema](10-events-schema.md)
+**配合**：[08-design-language](08-design-language.md) · [specs/m6-architecture](specs/m6-architecture.md) · [specs/m6-events-commands](specs/m6-events-commands.md)
 
 ## 角色 = 三件套（不是换皮 prompt）
 

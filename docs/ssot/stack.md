@@ -1,8 +1,8 @@
-# SSoT · 技术栈总表（锁定 / 延后 / 开放）
+# [归档] SSoT · 技术栈总表（锁定 / 延后 / 开放）
 
 **状态**：M0–M5 历史技术栈，已被 D019 解除锁定  
-**当前真源**：[../specs/m6-product-rebuild.md](../specs/m6-product-rebuild.md) · [design-system.md](design-system.md) · [i18n.md](i18n.md) · [platform-adaptation.md](platform-adaptation.md)  
-**说明**：下表只记录旧原型采用过的技术。React、Python、CrewAI、FastAPI、SSE、zustand、Tailwind、文件存储等均需重新评估，不能因本文旧状态继续进入 M6 主线。
+**当前真源**：[../specs/m6-product-rebuild.md](../specs/m6-product-rebuild.md) · [../specs/m6-architecture.md](../specs/m6-architecture.md) · [../specs/m6-runner-adapter.md](../specs/m6-runner-adapter.md) · [../specs/m6-events-commands.md](../specs/m6-events-commands.md) · [../specs/m6-platform-packaging.md](../specs/m6-platform-packaging.md) · [design-system.md](design-system.md) · [i18n.md](i18n.md) · [platform-adaptation.md](platform-adaptation.md)
+**说明**：下表只记录旧原型采用过的技术和历史锁定过程。新实现不能从本文推断技术硬锁；以当前 M6 架构、Runner、协议和平台规格为准。
 
 ---
 

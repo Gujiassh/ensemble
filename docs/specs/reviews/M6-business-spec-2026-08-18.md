@@ -47,3 +47,14 @@
 - `any` Join 允许其它分支继续执行，实施时必须确保迟到分支不会在 Run 结束后留下未归档工作。
 - 默认 pi 的自包含分发是跨平台验收前置条件，不能用开发机已有 Node 或 Python 代替。
 - 本文档审查通过不代表旧 M0–M5 实现符合 V2；旧代码仍只作为功能参考。
+
+## 5. 后续处理
+
+本轮业务规则已作为实施基线写入：
+
+- `m6-product-rebuild.md` §11
+- `m6-domain-model.md` §14
+- `m6-orchestration-interaction.md` §14
+- `m6-run-operations.md` §15
+
+原“待产品确认”条目已收敛为实现约束。剩余风险转入 [M6 Architecture Plan Review](M6-architecture-plan-2026-08-18.md)：Backend 进程形态、Runner 分发和三平台安装包仍需 Spike 与真实运行证据。

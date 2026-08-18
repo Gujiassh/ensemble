@@ -1,247 +1,162 @@
-# Ensemble 开发计划与技术栈
+# Ensemble V2 Development Plan
 
-**状态**：M0–M5 历史计划，已被 M6 重建取代  
-**当前入口**：[specs/m6-product-rebuild.md](specs/m6-product-rebuild.md)  
-**说明**：以下内容只记录旧原型的开发过程，不再作为待办或技术约束。  
+**状态**：当前执行计划（2026-08-18）
+**产品目标**：优雅、简约的桌面界面，以及灵活、可干预的 Agent 编排
+**原则**：先完成契约和架构，再写业务代码；每个阶段都以可验证交付物关闭
 
----
-
-## 1. 一句话
-
-做 **Living Org Canvas** 桌面应用：头像席位 + 管道传信 + 冒泡审批 + 档案插手；壳用 **Tauri 2（Rust）**，画布用 **React + xyflow**，**AI 编排框架用 CrewAI**，Runtime 用 **Python**，编码默认 **pi**。
-
----
-
-## 2. 技术栈（已锁定）
+## 1. 最终产品路径
 
 ```text
-┌─────────────────────────────────────────────┐
-│  Desktop Shell: Tauri 2 (Rust)              │
-│  窗口 · 权限 · FS · 托盘 · 拉起子进程         │
-└──────────────────┬──────────────────────────┘
-                   │ IPC / 本地端口
-┌──────────────────▼──────────────────────────┐
-│  UI: React 18 + TypeScript + Vite           │
-│  图: @xyflow/react                          │
-│  动效: CSS + motion(packet) · 图标 lucide    │
-│  样式: Tailwind v4 + CSS vars · store zustand │
-│  产品面: Living Org Canvas                   │
-└──────────────────┬──────────────────────────┘
-                   │ HTTP + SSE
-┌──────────────────▼──────────────────────────┐
-│  Runtime: Python 3.11+                      │
-│  stage / staffing / org tree / event bus    │
-│  **AI 框架: CrewAI**（Agent/Task/Crew 投影）  │
-│  CrewAI ≠ 产品门面；Org tree 仍是编制 SSoT    │
-└──────────────────┬──────────────────────────┘
-                   │ RunnerJob
-┌──────────────────▼──────────────────────────┐
-│  Runners: mock（先）· pi（默认真执行）· 可扩  │
-└─────────────────────────────────────────────┘
+创建 Workspace
+  -> 配置组织与 Workflow
+  -> 创建 Run Snapshot
+  -> 驱动 Runner 执行
+  -> 观察状态 / Handoff / Artifact
+  -> 处理 Attention
+  -> 完成、重试、打回或恢复
 ```
 
-| 层 | 技术 | 不做 |
-|----|------|------|
-| 壳 | **Tauri 2 + Rust** | Electron 默认；纯 Rust GUI 主界面 |
-| 画布 | **React 18 + TS + Vite 6 + @xyflow/react** | Vue 主线 |
-| 客户端状态 | **zustand** | Redux/Jotai 并行 |
-| 样式/图标 | **Tailwind v4** + **lucide-react** | Emotion 默认 |
-| 协议包 | **`packages/protocol`** | canvas 本地双源 |
-| Runtime HTTP | **FastAPI** + SSE | 裸 Starlette / WS 默认 |
-| 协议下行 | **SSE** + [10](10-events-schema.md) | UI 直读 CLI 私有日志 |
-| 协议上行 | **HTTP/IPC 命令** + [11](11-ui-commands.md) | UI 直拼 pi 命令行 |
-| **AI 框架** | **CrewAI**（锁定） | 用其它 agent 框架替换 CrewAI |
-| 编排 | **Python** + stage/staffing + CrewAI 投影 | Crew 写回 org 树 |
-| 执行 | **Runner 适配层**，默认 **pi** | 五家 CLI 一次做完 |
-| 存储 | 文件 `data/` 或 `~/.ensemble`；**无 SQLite MVP** | 云端多租户；SQLite 抢跑 |
+单 Agent 和多 Agent 都是正式路径。Runner、主题、语言和平台能力属于配置或适配边界，不得散落到业务组件中。
 
-### 目标仓库布局
+## 2. 阶段路线
+
+### F0 · 文档与架构基线（当前）
+
+交付：
+
+- [x] 产品、设计语言、领域模型、编排交互和运行操作规格
+- [x] 架构边界与数据所有权：[m6-architecture.md](specs/m6-architecture.md)
+- [x] Runner Adapter：[m6-runner-adapter.md](specs/m6-runner-adapter.md)
+- [x] Event / Command：[m6-events-commands.md](specs/m6-events-commands.md)
+- [x] 跨平台打包 Spike 规格：[m6-platform-packaging.md](specs/m6-platform-packaging.md)
+- [x] 本开发计划与旧 M0–M5 文档归档入口
+- [ ] 完成 Backend 进程形态 Spike
+
+关闭条件：
+
+- 进程形态、通信方式、数据目录和 Runner 分发有书面决策
+- Domain、Command、Event、Runner 四份契约通过一致性审查
+- 不再有活跃文档把 M0–M5 原型当作 V2 实现入口
+
+### F1 · Desktop Shell 与 Design System
+
+交付：
+
+- Tauri 桌面入口和 Runtime 生命周期
+- 画布优先布局：窄导航、全尺寸画布、按需 Inspector
+- Theme、Density、Motion、Contrast 和 Locale 注入
+- Workspace 创建：名称、项目目录、Runner、Agent 输出语言
+- 无 Workspace 时的首次启动路径
+
+关闭条件：
+
+- 不依赖开发服务器即可启动桌面壳
+- 浅色、深色、系统主题和两种首发语言可切换
+- Workspace 配置与设备偏好分开保存
+- 失败启动、退出和重启行为可验证
+
+### F2 · Workspace 与 Orchestration Editor
+
+交付：
+
+- Role、Seat、Group、Task、Transition、Gate、Join 编辑
+- 单 Agent、并行、`all/any` 和有限 Rework
+- Workflow 校验、Draft 自动保存、冲突提示
+- 画布布局移动与层级变更分离
+- 编排模板保存、复制和复用
+
+关闭条件：
+
+- 用户可从空 Workspace 创建单 Agent 编排
+- 用户可创建多 Agent 编排并看到明确的依赖与交付关系
+- 保存、重载、冲突和校验结果不会改变业务语义
+- 编辑器不写入 Run Snapshot 或 Runtime State
+
+### F3 · Runtime、Runner 与 Run Operations
+
+交付：
+
+- Run Snapshot 创建与冻结
+- Runtime 调度、事件日志、快照和恢复
+- Mock Adapter 和 `pi` Adapter
+- Task / Seat / Run 状态机
+- Handoff、Attention、Artifact 生命周期
+- Pause、Cancel、Retry、Rework、Inject 和 Recovery
+
+关闭条件：
+
+- 单 Agent 能完成一次真实 Run 并产生 Artifact
+- 多 Agent 能按依赖执行并产生 Handoff
+- 用户可审批、打回、追加指令和重试
+- 断线、重复命令和 Runtime 重启不会破坏 Run 账本
+- Client 不依赖 Runner 私有日志或前端定时器制造业务状态
+
+### F4 · 三平台交付
+
+交付：
+
+- Windows、macOS、Linux 安装包
+- 安装包内置或可靠连接 Backend execution unit
+- Runner 探测、平台目录、日志和进程清理
+- 首次启动、真实 Run、重启恢复和卸载验证
+
+关闭条件：
+
+- [m6-platform-packaging.md](specs/m6-platform-packaging.md) 验收矩阵三平台均有证据
+- 用户不需要安装 Python、Node 或其它开发环境
+- 应用退出后没有残留 Runtime/Runner 进程
+
+### F5 · 质量与发布
+
+交付：
+
+- 关键 Domain、Protocol、Runner、Persistence 单测
+- 三平台桌面冒烟和关键流程 E2E
+- 主题、语言、高 DPI、减少动态和键盘流程验证
+- 日志、诊断、错误恢复和数据备份说明
+- 开源贡献、安装和用户文档
+
+关闭条件：
+
+- 关键用户路径有自动化和真实平台证据
+- 没有未审查的跨层兼容代码或隐藏旧协议
+- 发行包、数据路径和恢复行为可复现
+
+## 3. 执行顺序
 
 ```text
-ensemble/
-  apps/canvas/           # React 画布（M1）
-  src-tauri/             # Tauri 2 Rust 壳（M4）
-  services/runtime/      # Python Runtime（M2–M3）+ CrewAI
-  #   ensemble_runtime/crew/  # Org→CrewAI 投影
-  runners/               # mock / pi adapters（M3–M4）
-  roles/catalog.yaml     # 角色模板
-  docs/                  # SSoT（已有）
-  data/ 或 ~/.ensemble/  # 运行时数据（本地）
+F0 文档/架构
+  -> Backend/打包 Spike
+  -> F1 Shell/Design System
+  -> F2 编排编辑器
+  -> F3 Runtime/Runner
+  -> F4 三平台交付
+  -> F5 质量与发布
 ```
 
----
+F1 与 F2 可以在契约关闭后拆分，但协议和核心数据模型只能由一个主责切片维护。F3 必须在 F2 的 Workflow 校验和 Snapshot 规则稳定后进入。F4 不能用浏览器预览替代。
 
-## 3. 当前进度
+## 4. 每个阶段的交付规则
 
-| 项 | 状态 |
-|----|------|
-| 产品 / 设计语言 / 决策 | ✅ 文档完成 |
-| 技术选型锁定 | ✅ 见 [ssot/stack.md](ssot/stack.md)（T001–T021） |
-| 事件 / 命令协议 | ✅ 10 + 11 |
-| 业务代码 | ✅ M1–M5 ACCEPT；文档 MVP 线完成 |
-| **下一刀** | **MVP 完成（M0–M5 ACCEPT）** |
+每个阶段都必须有：
 
----
+1. 目标与文件所有权。
+2. 可运行或可检查的交付物。
+3. 单元测试、协议检查或平台证据。
+4. 独立审查和修复记录。
+5. SSoT、Spec、Decision 和 Workbench 状态更新。
 
-## 4. 里程碑计划（M0–M5）
+阶段审查顺序：目标对齐 → 用户路径 → 架构边界 → 数据契约 → 测试与运行证据 → 下一阶段门禁。
 
-### M0 — 文档与协议 ✅
+## 5. 非目标
 
-- 设计语言 Living Org Canvas  
-- 栈锁定、事件 schema、命令面、org/roster/crew 所有权  
-- 验收定义 A/B/C  
+- 旧演示 UI、API 和数据迁移
+- 生产 Web 版、移动端、账户和多人云协作
+- 任意自由表达式流程引擎
+- Runner 插件市场
+- 以聊天窗口替代组织画布
+- 在未完成桌面交付前继续堆叠浏览器 Demo 功能
 
-### M1 — 画布 Mock（**当前起点**）
+## 6. 当前下一步
 
-**目标**：浏览器里就能演示「组织图活起来」（可不接真 LLM）。
-
-| 交付 | 说明 |
-|------|------|
-| `apps/canvas` | Vite + React + TS + xyflow 工程 |
-| Seat / Group 节点 | 头像、状态环、角标 |
-| Packet 边 | mock 光效 handoff |
-| 套娃 | ≥1 子 seat；折叠 + 父角标 |
-| Bubble | approve 冒泡 mock |
-| Dossier | History / Outputs / Prompt 面板（可本地 state） |
-| 模板 | 单 agent 布局 + 四人模板切换 |
-
-**验收**：06 脚本 A/B 的「看得见」部分；C 的套娃子集。  
-**不做**：真 pi、真 Python、Tauri 包装。  
-**性能预算**：可见节点 ≤40 时交互顺滑；折叠子树不挂重订阅。
-
-**建议工期**：约 3–5 人日（单人全力）。
-
-### M2 — Workspace + 事件总线
-
-| 交付 | 说明 |
-|------|------|
-| 多 Workspace 切换 | 隔离假数据或本地 JSON |
-| Group 框 + 过滤 | 画布分区 |
-| Runtime 最小 HTTP | 快照 `GET /org` + SSE 推 [10] 事件 |
-| 命令面接通 | [11] 中 `run.start` / `bubble.act` 可先 mock 实现 |
-
-**验收**：换 Workspace 不串状态；UI 由事件驱动而非纯 setTimeout 假动画。  
-**建议工期**：约 3–5 人日。
-
-### M3 — 真树 + 单 agent Run
-
-| 交付 | 说明 |
-|------|------|
-| `tree.json` / `edges[]` 持久化 | 按 09 §4.2 |
-| 单 agent stage loop | plan → implement → gate |
-| MockRunner → 写 artifacts | 契约检查 |
-| roster 挂载字段 | staffing L1 可后置到本里程碑末 |
-| 打回 rework | 产物 v2 |
-
-**验收**：06 脚本 A 全过（真落盘）。  
-**建议工期**：约 4–6 人日。
-
-### M4 — Tauri 壳 + pi
-
-| 交付 | 说明 |
-|------|------|
-| `src-tauri` | 包装 canvas；窗口与权限 |
-| 拉起 Python runtime | dev/prod 脚本 |
-| PiRunner | Engineer seat 默认 runner |
-| 四人模板真跑通 | 可弱化 Researcher 为只读工具 |
-
-**验收**：06 脚本 B 在桌面壳内可演示；C 的 L1 QA 建议可选。  
-**建议工期**：约 5–8 人日。
-
-### M5 — 套娃与多区打磨
-
-| 交付 | 说明 |
-|------|------|
-| 默认渲染集 + LOD | 按 09 阈值 |
-| 跨 Workspace 待办托盘 | 跳回正确 seat |
-| 压测 | 200 节点 / 深 8 折叠可用 |
-
-**验收**：06 脚本 C 全过 + 不崩。  
-**建议工期**：约 3–5 人日。
-
----
-
-## 5. 总体排期（参考）
-
-| 阶段 | 累计（单人粗估） | 可演示物 |
-|------|------------------|----------|
-| M0 | 已完成 | 文档 |
-| M1 | +1 周内 | 浏览器组织图画皮+交互 |
-| M2 | +1 周 | 多区 + 事件驱动 |
-| M3 | +1–1.5 周 | 单 agent 真 Run 落盘 |
-| M4 | +1.5–2 周 | 桌面壳 + pi |
-| M5 | +1 周 | 套娃/LOD/托盘 |
-
-**MVP 可发布演示线**：M4 结束（桌面 + 单/四人 + pi）。  
-**完整文档 MVP（A+B+C）**：M5 结束。
-
-并行策略：见 [13-multi-agent-workflow](13-multi-agent-workflow.md)。  
-**门禁**：M1 骨架 Audit ACCEPT 后，才允许多 agent × 多 worktree 并行；**每阶段/每 lane 必须配 Audit agent**。  
-详细任务以 `docs/specs/m1`–`m4` 为准。  
-
----
-
-## 6. 开发顺序原则
-
-1. **先画布，后壳**：M1 浏览器验证设计语言，M4 再 Tauri。  
-2. **先 mock runner，后 pi**：不堵 UI。  
-3. **先单 agent，后四人**：降编排复杂度。  
-4. **事件/命令契约不破**：UI 不直连 pi。  
-5. **Org tree 为编制 SSoT**：Crew 只投影。  
-6. **无效改动回滚**：跑不通的临时兼容层不留。  
-
----
-
-## 7. M1 开工清单（可直接开干）
-
-```text
-[ ]  monorepo：apps/canvas + packages/protocol（pnpm workspace，禁 npm 主线）
-[ ]  Vite + React 18 + TS（已锁；勿升 React 19）
-[ ]  依赖硬锁：@xyflow/react · zustand（唯一 store）· tailwindcss v4 · lucide-react
-[ ]  packet 动效可选 motion（仅边/packet）；类型从 @ensemble/protocol
-[ ]  mock store：single_agent / four_crew / nested 三套 fixture
-[ ]  SeatNode + GroupNode + PacketEdge
-[ ]  冒泡层 + Dossier 抽屉
-[ ]  Stage/Work 模式切换（动效强弱）
-[ ]  Vitest 脚手架可跑；README 启动：pnpm dev:canvas
-```
-
-环境前提：
-
-- Node 20+  
-- （M3+）Python 3.11+  
-- （M4）Rust stable + Tauri 系统依赖  
-- （M4）本机已装 `pi`  
-
----
-
-## 8. 风险与缓冲
-
-| 风险 | 应对 |
-|------|------|
-| xyflow 大图卡 | 渲染集 + 子画布；M5 LOD |
-| Linux WebView | M4/M5 早测；Electron 仅回退 |
-| Crew 与树双写 | 禁止 Crew 写 tree |
-| pi 非交互差异 | Runner 适配集中处理 |
-| 范围膨胀 | 严格 06 Out of Scope |
-
----
-
-## 9. 文档地图（开发时读什么）
-
-| 你在做… | 先读 |
-|---------|------|
-| 画布交互 / 好看 | 08、04（仅归档对照） |
-| 工程目录 / 栈 | 09、本文 |
-| 事件与状态 | 10 |
-| 按钮/审批/注入 | 11 |
-| 角色与扩编 | 05 |
-| 是否做完 | 06 验收 A/B/C |
-| 架构边界 | 03 |
-
----
-
-## 10. 决策索引
-
-- D008 设计语言 · D009 套娃/单 agent/多区 · D010a/D013 栈 · D014 协议钉死 · **D017 CrewAI** · **D018 栈余项判决**  
-- 全表：[ssot/stack.md](ssot/stack.md) · [ssot/crewai.md](ssot/crewai.md)  
+先完成 [m6-platform-packaging.md](specs/m6-platform-packaging.md) 定义的 Backend 进程形态 Spike，并把结论写回 [m6-architecture.md](specs/m6-architecture.md)、Runner Adapter 和平台 SSoT。Spike 关闭后，才开始 F1 的新桌面壳和 Design System 实现。

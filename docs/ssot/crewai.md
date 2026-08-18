@@ -1,7 +1,7 @@
 # SSoT · CrewAI（AI 编排框架）
 
-**状态**：M0–M5 历史选型，D019 后不再硬锁  
-**说明**：M6 可以保留、替换或移除 CrewAI；必须以灵活编排、Runner 可替换和跨平台交付证据重新判断。  
+**状态**：V2 运行时约束（2026-08-18）
+**说明**：多角色编排使用 CrewAI 做只读投影；CrewAI 不拥有组织模型，也不替代 Runner。
 **范围**：`services/runtime` 内多角色协作语义  
 **非范围**：Living Org Canvas UI、Org tree 写路径、Runner 协议本身  
 
@@ -32,7 +32,7 @@ Org tree (SSoT) → CrewAI projection (Agent/Task/Crew) → RunnerJob (pi/mock)
 - 可观测任务边界，便于映射到 `seat.status` / `edge.packet` / artifacts  
 - **不**用它做：组织图 UI、workspace 隔离、多 CLI 桌面壳  
 
-禁止：用 LangGraph / AutoGen / 自研伪 Crew 替换本锁定，除非新决策条目显式改 D002。
+禁止：用 LangGraph / AutoGen / 自研伪 Crew 替换本约束，除非新决策条目显式改 D002。
 
 ---
 
@@ -96,8 +96,8 @@ python -c "from ensemble_runtime.crew import project_org_to_crew; ..."
 
 ## 6. 交叉引用
 
-- 架构：`docs/03-architecture.md`  
-- 技术栈：`docs/09-tech-and-desktop.md`（T009）  
+- 架构：[specs/m6-architecture.md](../specs/m6-architecture.md)
+- 技术架构：[specs/m6-architecture.md](../specs/m6-architecture.md)
 - 计划：`docs/12-dev-plan.md`  
 - 决策：D002 / D002a / D017  
 - Spec：`docs/specs/m3-runtime-single-agent.md` · `m4-tauri-pi.md`  
