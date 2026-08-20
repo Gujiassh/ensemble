@@ -1,6 +1,10 @@
 # M6 Architecture Plan Review
 
 **日期**：2026-08-18
+**状态**：**SUPERSEDED** by [M6-runtime-scheduling-review-2026-08-20.md](M6-runtime-scheduling-review-2026-08-20.md)
+
+本文记录进程形态尚未选择时的阶段性审查。后续已经选择 Tauri supervisor + Rust Runtime sidecar，并补全调度、恢复、权限和 Runner 协议；下文的 ACCEPT 与 Spike 入口描述只保留为历史证据，不是当前实施门禁。
+
 **范围**：M6 架构、Runner、Event/Command、跨平台打包规格和 V2 开发计划
 **风险级别**：Critical。文档约束进程生命周期、协议、持久化边界和三平台交付。
 

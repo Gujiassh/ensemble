@@ -1,6 +1,9 @@
 # M6 Business Spec Review
 
 **日期**：2026-08-18
+**状态**：**SUPERSEDED** by [M6-runtime-scheduling-review-2026-08-20.md](M6-runtime-scheduling-review-2026-08-20.md)
+
+本文记录 2026-08-18 的阶段性审查。后续已完成其中的产品门禁，并重写 Runtime、Runner、权限、调度、恢复和跨平台边界；下文的 PASS、Remaining Product Gates 和 residual risk 只保留为历史证据，不是当前实施门禁。
 
 **范围**：`m6-domain-model.md`、`m6-orchestration-interaction.md`、`m6-run-operations.md`、M6 索引与 V2 SSoT 对齐
 **风险级别**：Critical。文档定义了持久化边界、Run 快照、状态机和人工操作语义。

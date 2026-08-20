@@ -38,4 +38,4 @@
 
 ## Decision
 
-**ACCEPT** for the F1-A frontend implementation lane. Grok may implement F1-01 through F1-15 against this specification. The main controller must audit the resulting diff and evidence before committing. F1-16 through F1-20 remain blocked by F0 Backend/Packaging and must not be silently implemented or marked complete by F1-A code.
+**ACCEPT** for the F1-A frontend implementation lane. Grok may implement F1-01 through F1-15 against this specification. The main controller must audit the resulting diff and evidence before committing. F1-16 through F1-20 remain pending F0 Backend/Packaging verification and must not be silently marked complete by F1-A code.

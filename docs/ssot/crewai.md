@@ -1,13 +1,13 @@
 # SSoT · CrewAI（AI 编排框架）
 
-**状态**：历史运行时约束，已被 D019/M6 架构评估取代（2026-08-18）
-**说明**：本文件记录早期 CrewAI 只读投影方案，不是当前 Backend 或前端实现合同。
+**状态**：历史运行时约束，已被 D026 和 M6 Rust Runtime 决策取代（2026-08-19）
+**说明**：本文件记录 M0-M5 的 CrewAI 只读投影方案，不是当前 Backend、Runner 或前端实现合同。
 **范围**：历史 `services/runtime` 多角色协作方案
 **非范围**：当前 Canvas 工作台、Workspace 写路径、Runner 协议本身
 
 ---
 
-## 1. 锁定结论
+## 1. 当时的锁定结论
 
 | 项 | 值 |
 |----|-----|
@@ -29,10 +29,10 @@ Org tree (SSoT) → CrewAI projection (Agent/Task/Crew) → RunnerJob (pi/mock)
 
 - 成熟的多角色 `Agent` / `Task` / `Crew` 语义  
 - sequential / hierarchical 协作与 Ensemble「分工 + handoff」叙事对齐  
-- 可观测任务边界，便于映射到 `seat.status` / `edge.packet` / artifacts  
+- 可观测任务边界，便于映射到 `seat.status.changed` / `handoff.created` / `artifact.created`
 - **不**用它做：组织图 UI、workspace 隔离、多 CLI 桌面壳  
 
-禁止：用 LangGraph / AutoGen / 自研伪 Crew 替换本约束，除非新决策条目显式改 D002。
+本段只解释历史选择。D026 已显式覆盖 D002、D017 和 D022；V2 使用自己的 Workflow、RunSnapshot、Event 和 ExecutionClaim 调度，不替换成另一套 Agent 框架。
 
 ---
 
@@ -99,5 +99,5 @@ python -c "from ensemble_runtime.crew import project_org_to_crew; ..."
 - 架构：[specs/m6-architecture.md](../specs/m6-architecture.md)
 - 技术架构：[specs/m6-architecture.md](../specs/m6-architecture.md)
 - 计划：`docs/12-dev-plan.md`  
-- 决策：D002 / D002a / D017  
+- 历史决策：D002 / D002a / D017 / D022；覆盖决策：D026
 - Spec：`docs/specs/m3-runtime-single-agent.md` · `m4-tauri-pi.md`  

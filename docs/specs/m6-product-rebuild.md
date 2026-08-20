@@ -1,7 +1,7 @@
 # M6 Spec — Product Rebuild
 
-**状态**：实施基线 v1（2026-08-18）
-**真源**：[../01-product.md](../01-product.md) · [../08-design-language.md](../08-design-language.md) · [../ssot/design-system.md](../ssot/design-system.md) · [../ssot/i18n.md](../ssot/i18n.md) · [../ssot/platform-adaptation.md](../ssot/platform-adaptation.md) · [m6-domain-model.md](m6-domain-model.md) · [m6-orchestration-interaction.md](m6-orchestration-interaction.md) · [m6-run-operations.md](m6-run-operations.md) · [m6-architecture.md](m6-architecture.md) · [m6-runner-adapter.md](m6-runner-adapter.md) · [m6-events-commands.md](m6-events-commands.md) · [m6-platform-packaging.md](m6-platform-packaging.md)
+**状态**：实施基线 v1（2026-08-20）
+**真源**：[../01-product.md](../01-product.md) · [../08-design-language.md](../08-design-language.md) · [../ssot/design-system.md](../ssot/design-system.md) · [../ssot/i18n.md](../ssot/i18n.md) · [../ssot/platform-adaptation.md](../ssot/platform-adaptation.md) · [m6-domain-model.md](m6-domain-model.md) · [m6-orchestration-interaction.md](m6-orchestration-interaction.md) · [m6-run-operations.md](m6-run-operations.md) · [m6-agent-session-collaboration.md](m6-agent-session-collaboration.md) · [m6-execution-workspace-security.md](m6-execution-workspace-security.md) · [m6-architecture.md](m6-architecture.md) · [m6-runner-adapter.md](m6-runner-adapter.md) · [m6-events-commands.md](m6-events-commands.md) · [m6-local-runtime-scheduling.md](m6-local-runtime-scheduling.md) · [m6-platform-packaging.md](m6-platform-packaging.md)
 
 ## 1. 目标
 
@@ -10,12 +10,16 @@
 首个可验收版本必须证明：
 
 - 用户能创建 Workspace 并选择 Runner
-- 用户能配置单 Agent 或多 Agent 编排
+- 用户能配置多 Agent 编排，并自然退化为单 Agent 路径
+- 首个真实闭环包含多个 formal Seat、并行实例、一个派生 worker 和跨 Runner 交接
 - Run 状态、Handoff、Attention 和 Artifact 可观察
 - 用户能介入、审批、打回和重试
 - UI 简约且画布优先
 - Theme、Locale 和平台适配从架构层成立
-- Windows、macOS、Linux 不依赖外部开发环境
+- Windows、macOS、Linux 的 Ensemble Runtime 不依赖外部开发环境；三个 Runner CLI 由用户安装和登录
+- 关闭窗口后活动 Run、队列和计划继续；重启后按风险恢复，不重复状态不明的副作用
+- 共享 Workspace、Git worktree 和临时隔离目录可由分发 Agent 选择并由 Runtime 校验
+- 权限、指定目录、派生预算、秘密处理和历史策略可配置且可审计
 
 ---
 
@@ -46,11 +50,11 @@ apps/canvas/
   design-system/
   i18n/
 
-services/runtime/
-  api/
+services/runtime-rs/
+  transport/
   domain/
-  orchestration/
-  runners/
+  scheduler/
+  adapters/
   events/
   persistence/
 
@@ -72,8 +76,10 @@ src-tauri/
 | Theme、UI Locale、Density | Tauri preferences | 设备级 |
 | Workspace path、默认 Runner、默认输出语言 | Workspace config | Workspace 级 |
 | Role、Seat、Group、Task、Transition、Gate、Join、Contract | Orchestration config | 可编辑模板 |
+| ExecutionPolicyVersion、RunLaunchSpec、ScheduleLaunchTemplate、Queue Item、Schedule、ScheduleFire | Runtime persistence | Workspace 级；策略与启动输入不可变，Schedule 配置可更新或归档 |
 | Runner、Prompt、编排版本、输出语言 | Run snapshot | Run 启动时冻结 |
-| Status、Handoff、Attention | Runtime events | Run 运行时 |
+| Status、Handoff | Runtime events | Run 运行时 |
+| Attention | Runtime events | Workspace 级，scope 指向 Run 或 Queue Item |
 | Artifact | Runtime persistence | Run 级 |
 
 任何字段跨越上述边界前必须更新 SSoT。
@@ -85,7 +91,7 @@ src-tauri/
 ### A. 首次启动
 
 1. 应用读取系统语言、主题和平台能力
-2. Backend 完成进程内自检，或 sidecar 启动并通过健康检查
+2. Tauri Shell 启动 Rust Runtime sidecar，完成认证、协议握手、账本对账和健康检查
 3. 无 Workspace 时进入创建流程
 4. 不出现开发态 Fixture
 
@@ -103,7 +109,7 @@ src-tauri/
 
 1. 从单 Agent 或模板开始
 2. 编辑 Role、Seat 和 Group
-3. 定义 Task、Transition、Artifact Contract 和 Attention Gate
+3. 定义 Task、Transition、交付契约和 Attention Gate
 4. 校验输入、输出和依赖
 5. 保存编排版本
 
@@ -114,8 +120,16 @@ src-tauri/
 3. Canvas 接收稳定事件并更新状态
 4. Handoff 触发一次方向脉冲
 5. Attention 要求用户介入
-6. Artifact 可查看
+6. 交付结果可查看
 7. Run 完成、失败或进入重试
+
+### E. 后台与计划
+
+1. 用户把编排版本、输入、Runner 绑定、transient Runner allow-list、输出语言和执行策略冻结为 RunLaunchSpec 后加入队列，或冻结为 ScheduleLaunchTemplate 后创建 `cron | interval` 计划
+2. 关闭主窗口后应用进入托盘，Runtime 继续活动 Run 和计划
+3. 计划触发创建唯一 ScheduleFire，再走与手动启动相同的 Run 事务
+4. 未预授权操作暂停并创建 Attention，通过系统通知提示
+5. 重启后默认只补跑每个计划的最新一次，并按副作用证据决定自动恢复或等待用户
 
 ---
 
@@ -136,11 +150,11 @@ src-tauri/
 Windows、macOS、Linux 分别提供：
 
 - 可安装包
-- 安装包内置 Backend execution unit
+- 安装包内置 Rust Runtime sidecar 和三个官方 Adapter
 - 首次启动证据
 - Workspace 创建证据
-- Runner 探测和一次真实 Run 证据
-- 使用 sidecar 时，退出后无残留 Backend 进程
+- `pi`、Codex CLI 和 Claude Code 的探测、原样 Terminal、权限和真实 Run 证据
+- 关窗到托盘继续运行，以及显式退出后无无主 Runner 的证据
 - 平台数据目录验证
 
 浏览器开发预览不能代替桌面验收。
@@ -173,8 +187,14 @@ Windows、macOS、Linux 分别提供：
 8. Windows、macOS、Linux CI 构建方案
 9. Workspace 创建、编排编辑、自动保存和冲突交互规格
 10. Run、Attention、Artifact、暂停取消和恢复规格
+11. 执行目录、派生、权限、秘密和历史规格
+12. 托盘后台、队列、计划、执行租约和风险感知恢复规格
 
 F1 的前端实施细节见 [f1-shell-design-system.md](f1-shell-design-system.md)。该规格的 gateway seam 允许 Shell/Design System 与 Runtime 进程形态解耦；它不替代 F0 的 Backend/Packaging Spike。
+
+Agent 派生来源、Active Seats 分组、不同 CLI 协作以及同一 Runner 实例的 Session/Terminal 语义见 [m6-agent-session-collaboration.md](m6-agent-session-collaboration.md)。首版不维护 CLI slash command 推荐镜像。
+
+执行目录、派生默认预算、权限档位、指定目录、秘密脱敏、历史搜索和导出见 [m6-execution-workspace-security.md](m6-execution-workspace-security.md)。正式 supported Runner 必须同时提供 Session、Terminal 和 Context package 投递。
 
 完成上述设计后再拆分实际开发任务。
 
@@ -197,13 +217,18 @@ F1 的前端实施细节见 [f1-shell-design-system.md](f1-shell-design-system.m
 
 ## 11. 已确认的实施门禁
 
-以下六组规则作为 M6 实现约束；Backend 进程形态仍由 [m6-platform-packaging.md](m6-platform-packaging.md) Spike 决定：
+以下规则作为 M6 实现约束；Rust sidecar 已选定，实际能力仍由 [m6-platform-packaging.md](m6-platform-packaging.md) Spike 证明：
 
-1. **Runner 选择**：Workspace 创建至少需要一个可用 Profile；`pi` 为默认推荐，Task/Seat 覆盖属于高级配置，默认 Runner 的生产分发不得要求用户另装 Node。
-2. **Workflow 能力**：首版支持 Task、Gate、Join、并行、`all/any` 和有上限 Rework，不支持任意脚本或自由表达式；Gate 首版固定阻塞。
+1. **Runner 选择**：Workspace 创建至少需要一个设备 installation 可用、且对当前 Workspace policy/required capabilities 为 qualified 的 Profile；`pi` 为默认推荐，Task/Seat 覆盖属于高级配置。首版内置 `pi`、Codex CLI 和 Claude Code Adapter，CLI 本体与原生登录由用户管理，三个 Runner 必须通过三平台九组合门槛。
+2. **Workflow 能力**：首版支持 Task、Gate、Join、并行、`all/any`、显式 End outcome、Optional skipped path 和有上限 Rework，不支持任意脚本或自由表达式；Gate 首版固定阻塞且没有第二个 `blocked` 状态。多 formal Task Workflow 必须指定 Dispatcher Task；其业务 Attempt 正常终态化，Runtime 通过该 formal AgentInstance 的 Run-scoped DispatcherCoordinationLease 选择其它 formal 实例的执行目录。没有业务 Attempt owner 时，replacement coordination Handle 通过独立 CoordinationLaunch 建立，不伪造 TaskAttempt。spawn-capable parent 通过当前 Attempt channel 选择自己 worker 的目录。
 3. **画布与保存**：画布拖动只改布局，层级移动使用明确命令；Draft 自动保存，冲突不静默合并，启动 Run 创建不可变版本。
 4. **运行快照**：Run 只读 Snapshot；Amendment 只能追加 Snapshot 后代并影响未开始部分，不能改历史 Task、Artifact 或 Gate。
 5. **运行控制**：Pause 停止新派发并按 Runner 能力到安全边界；Cancel 不可逆；下游已开始后的重跑创建新 Run，不回滚原 Run。
-6. **人工介入与恢复**：实时补充指令需要 Runner capability，否则进入下一次 Attempt；Attention 幂等；崩溃通过事件对账和 recovery Attempt 恢复。
+6. **人工介入与恢复**：实时补充指令需要 Runner capability，否则进入下一次 Attempt；Attention 幂等；崩溃通过事件对账恢复。普通业务工作使用 recovery Attempt，coordination-only Handle 使用 CoordinationLaunch；已有 cancel/finalization intent 只继续原资源收敛，不恢复业务。
+7. **执行目录**：Runtime 先创建 TaskExecution，再为已预分配 target 实例向 active Dispatcher lease/parent Attempt 发起带 request digest 的稳定 SelectionRequest；Agent 从共享 Workspace、Git worktree 和临时目录中结构化选择，Runtime 校验并持久化，超时或冲突不静默回退。首次派发、Retry、Recovery 和 Rework 都在 assignment 完成后才创建 Attempt；派生 worker 的全链路由 canonical SpawnRequest 关联。
+8. **派生策略**：默认 `auto`；Workspace 活动 4、单父子 worker 2、深度 2、单 Run 原始实例谱系 8、每条谱系恢复代次 3，全部可配置。
+9. **权限与历史**：四个权限档位和五项独立能力策略进入 RunSnapshot；秘密只保存引用；原始 Terminal 默认保留 30 天且每 Run 100 MB。
+10. **后台与调度**：关闭窗口进入托盘；队列和 `cron | interval` 计划由 Runtime 持久化。错过计划默认补最新一次，后台超出预授权时暂停并通知。
+11. **恢复**：Runtime 使用 SQLite Event、ExecutionClaim 和 ScheduleFire 对账。只有无副作用、可验证幂等或有可靠 checkpoint 的工作自动恢复，状态不明的外部副作用必须等待用户。
 
 实现不得用旧 M0–M5 的 Stage、Edge、Bubble 或命令语义替代以上规则。

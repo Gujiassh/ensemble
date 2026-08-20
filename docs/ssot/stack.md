@@ -1,7 +1,7 @@
 # [归档] SSoT · 技术栈总表（锁定 / 延后 / 开放）
 
 **状态**：M0–M5 历史技术栈，已被 D019 解除锁定  
-**当前真源**：[../specs/m6-product-rebuild.md](../specs/m6-product-rebuild.md) · [../specs/m6-architecture.md](../specs/m6-architecture.md) · [../specs/m6-runner-adapter.md](../specs/m6-runner-adapter.md) · [../specs/m6-events-commands.md](../specs/m6-events-commands.md) · [../specs/m6-platform-packaging.md](../specs/m6-platform-packaging.md) · [design-system.md](design-system.md) · [i18n.md](i18n.md) · [platform-adaptation.md](platform-adaptation.md)
+**当前真源**：[../specs/m6-product-rebuild.md](../specs/m6-product-rebuild.md) · [../specs/m6-architecture.md](../specs/m6-architecture.md) · [../specs/m6-runner-adapter.md](../specs/m6-runner-adapter.md) · [../specs/m6-agent-session-collaboration.md](../specs/m6-agent-session-collaboration.md) · [../specs/m6-execution-workspace-security.md](../specs/m6-execution-workspace-security.md) · [../specs/m6-events-commands.md](../specs/m6-events-commands.md) · [../specs/m6-local-runtime-scheduling.md](../specs/m6-local-runtime-scheduling.md) · [../specs/m6-platform-packaging.md](../specs/m6-platform-packaging.md) · [design-system.md](design-system.md) · [i18n.md](i18n.md) · [platform-adaptation.md](platform-adaptation.md)
 **说明**：下表只记录旧原型采用过的技术和历史锁定过程。新实现不能从本文推断技术硬锁；以当前 M6 架构、Runner、协议和平台规格为准。
 
 ---
@@ -41,13 +41,13 @@
 | 客户端状态 | **zustand** | LOCKED | T010（scaffold 已用；禁 Redux/Jotai 并行主线） |
 | 协议类型包 | **`packages/protocol`**（唯一 TS 真源） | LOCKED | T011 |
 | 样式 | **Tailwind CSS v4** + CSS 变量 HUD token | LOCKED | T012 |
-| 动效 | **CSS 优先**；管道光点可用 **`motion`**（原 framer-motion）**仅限边/packet** | LOCKED | T013 |
+| 动效 | **CSS 优先**；Handoff 方向脉冲可用 **`motion`**（原 framer-motion）**仅限交接路径** | LOCKED | T013 |
 | 图标 | **lucide-react** | LOCKED | T014 |
 | 字体（MVP） | **系统栈**：`ui-sans-serif, system-ui` + `ui-monospace` | LOCKED | T015 |
 | 字体（后置） | 自托管 Inter / JetBrains Mono | DEFERRED | M5+ 视觉打磨 |
 | 前端单测 | **Vitest**（M1 可选；**M2 apply 事件强制**） | LOCKED | T016 |
 | E2E | Playwright | DEFERRED | M4+ 桌面/浏览器冒烟 |
-| Diff 预览 | M1–M3：**等宽纯文本**；专用 diff 组件 | DEFERRED | 不阻塞 artifacts |
+| Diff 预览 | 首版专用查看器：changed files、Unified/Split、基线/目标和行定位 | REQUIRED · implementation choice open | [workspace-output-inspection](../specs/workspace-output-inspection.md) |
 
 **明确不选（前端）**：Vue / Vue Flow；Emotion/styled-components 作默认样式体系；多状态库并行。
 
@@ -105,7 +105,7 @@
 
 | # | 原表述 | 判决 | ID |
 |---|--------|------|-----|
-| 1 | 动效 CSS + Motion（或等价） | CSS 优先 + `motion` 仅 packet | T013 |
+| 1 | 动效 CSS + Motion（或等价） | CSS 优先 + `motion` 仅用于 Handoff 方向脉冲 | T013 |
 | 2 | 可用 Tailwind（实现时定） | **Tailwind v4 + CSS 变量 token** | T012 |
 | 3 | 状态库 zustand 等任选 | **zustand 唯一** | T010 |
 | 4 | FastAPI/Starlette 或等价 | **FastAPI**（不用 Starlette 裸写主线） | T017 |

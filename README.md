@@ -10,16 +10,21 @@ Coding-agent work is easy to scatter across terminals, chat threads, and output 
 
 ## How it works
 
-1. **Create a workspace** around a project directory and choose the execution engine that fits it. `pi` is the default Runner, and Runner adapters remain replaceable.
+1. **Create a workspace** around a project directory, choose its permissions, and select an installed agent CLI. `pi` is the recommended default; Codex CLI and Claude Code are also first-class Runners.
 2. **Compose an orchestration** from roles, seats, groups, tasks, dependencies, handoffs, deliverables, and approval gates.
 3. **Run and supervise** the workflow. Follow progress, inspect artifacts, approve results, add instructions, pause, cancel, retry, or rework tasks.
 
 ## Core capabilities
 
-- Start with a single agent or compose a multi-agent workflow.
+- Coordinate a multi-agent workflow, or use the same model for a focused single-agent run.
 - Make responsibility and execution order explicit.
 - Track live run state, human attention points, handoffs, and artifacts in context.
 - Keep files, diffs, reports, and structured results attached to the run that produced them.
+- Inspect every active agent through a durable session or its original CLI terminal without starting a second process.
+- Run parallel work in shared directories, isolated Git worktrees, or temporary workspaces, with configurable permissions and spawn budgets.
+- Review isolated changes before applying them, or opt into automatic integration only when the baseline is unchanged and the result is conflict-free.
+- Search, export, and recover task-bound conversations, decisions, changes, and deliverables.
+- Keep active runs moving from the system tray, and launch saved orchestrations from a persistent queue or schedule.
 - Save and reuse workflow configurations across workspaces.
 - Use light, dark, system, or custom themes without changing the meaning of a status.
 - Configure the interface language and agent output language independently. The interface supports multiple locales, including `en-US` and `zh-CN`.
@@ -40,6 +45,9 @@ Ensemble is focused on coding-agent orchestration. It is not a general-purpose w
 - [Design system](docs/ssot/design-system.md)
 - [Languages and internationalization](docs/ssot/i18n.md)
 - [Desktop platform requirements](docs/ssot/platform-adaptation.md)
+- [Agent sessions and collaboration](docs/specs/m6-agent-session-collaboration.md)
+- [Execution workspaces and permissions](docs/specs/m6-execution-workspace-security.md)
+- [Local Runtime, scheduling, and recovery](docs/specs/m6-local-runtime-scheduling.md)
 
 ## Contributing
 

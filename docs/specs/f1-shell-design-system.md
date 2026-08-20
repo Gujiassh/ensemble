@@ -1,6 +1,6 @@
 # F1 Spec: Desktop Shell, Design System, and Workspace Entry
 
-**Status**: Current implementation specification (2026-08-18)
+**Status**: Current implementation specification, revised 2026-08-19
 **Owner**: F1-A frontend lane, followed by an F1-B desktop integration lane
 **Depends on**: [m6-product-rebuild.md](m6-product-rebuild.md), [m6-architecture.md](m6-architecture.md), [m6-domain-model.md](m6-domain-model.md), [m6-orchestration-interaction.md](m6-orchestration-interaction.md), [../08-design-language.md](../08-design-language.md), [../ssot/design-system.md](../ssot/design-system.md), [../ssot/i18n.md](../ssot/i18n.md)
 **Review rule**: This specification is the implementation source for F1. Existing M0-M5 code, fixtures, API routes, and visual patterns are not requirements.
@@ -10,14 +10,14 @@
 F1 produces the first usable desktop-facing product surface. It is delivered in two lanes:
 
 - **F1-A Client Foundation** can start after this specification is accepted. It covers the React shell, design system, preferences, i18n, Workspace entry flow, and typed gateway seam.
-- **F1-B Desktop Integration** starts only after F0 selects the Backend process shape. It binds platform preferences, directory selection, Runtime lifecycle, and the real gateway in Tauri.
+- **F1-B Desktop Integration** starts only after F0 proves the selected Rust Runtime sidecar on the target platform. It binds platform preferences, directory selection, tray lifecycle, Runtime supervision, and the real gateway in Tauri.
 
 The combined phase delivers:
 
 1. A quiet, canvas-first shell with a narrow navigation rail and an on-demand inspector.
 2. A semantic design-token layer that supports light, dark, system, density, motion, contrast, and locale independently.
 3. A first-start path that handles boot, backend unavailable, no Workspace, and Workspace creation.
-4. A Workspace creation flow for name, project directory, Runner profile, and Agent output locale.
+4. A Workspace creation flow for name, project directory, Runner profile, permissions, and Agent output locale.
 5. A typed boundary between the client and future Runtime services. F1 must not invent a second persistence or business-state protocol.
 6. A verification surface that can be run in a browser and inside the Tauri shell without old development controls.
 
@@ -35,7 +35,7 @@ F1-A is a product-surface slice. It does not claim that a Workspace has been per
 - Normal, high, and system contrast settings where the platform exposes them.
 - `zh-CN` and `en-US` UI locales.
 - Device preference persistence through a replaceable adapter.
-- Workspace creation form, validation, Runner probe presentation, and output-locale selection.
+- Workspace creation form, validation, Runner probe presentation, permission profile/path selection, and output-locale selection.
 - Backend gateway interfaces and explicit unavailable/error states.
 - Keyboard navigation, focus management, screen-reader names, reduced-motion behavior, and locale expansion checks.
 - Unit tests, component tests, and screenshots for the F1 states.
@@ -50,9 +50,9 @@ F1-A is a product-surface slice. It does not claim that a Workspace has been per
 
 ### 2.3 Excluded from all of F1
 
-- Runtime sidecar or in-process Backend implementation.
+- Runtime sidecar implementation.
 - Runtime authentication, port allocation, process supervision, or platform packaging.
-- Real Runner probing or `pi` execution. F1 uses typed probe results supplied by a gateway or test fixture.
+- Real Runner probing or `pi`/Codex CLI/Claude Code execution. F1 uses typed probe results supplied by a gateway or test fixture.
 - Organization and Workflow editing, task dependencies, gates, joins, rework, or Run Snapshot creation.
 - Run status, Handoff, Attention, Artifact, SSE, or command/event persistence.
 - Migration of M0-M5 fixtures or old API routes.
@@ -65,6 +65,7 @@ Anything in the excluded list must be represented by an interface or an unavaila
 | Area | F1 decision |
 |---|---|
 | Primary composition | Narrow navigation rail + full canvas + on-demand inspector; no permanent three-column layout |
+| Visual reference | Discord-like compact density, selection, and surface hierarchy only; never copy server/channel structure or replace the canvas with chat columns |
 | Default appearance | Light theme, cool white canvas, charcoal text, vermilion primary signal |
 | Surface language | Seat and Group are spatial objects, not nested cards; page sections are unframed layouts |
 | Business state | Client view state is separate from Workspace, Workflow, Snapshot, and Runtime state |
@@ -306,10 +307,10 @@ F1 supplies the viewport boundary and empty/loading/error states. A typed projec
 
 ## 8. Workspace creation contract
 
-The creation flow is a reversible four-step form:
+The creation flow is a reversible five-step form:
 
 ```text
-name -> project directory -> Runner profile -> Agent output locale -> review/create
+name -> project directory -> Runner profile -> permissions -> Agent output locale -> review/create
 ```
 
 ### 8.1 Form state
@@ -319,9 +320,20 @@ type WorkspaceCreateDraft = {
   name: string;
   projectPath: string | null;
   runnerProfileId: string | null;
+  permissionProfile: "read_only" | "workspace_write" | "selected_paths" | "full_access";
+  pathGrants: Array<{ path: string; access: "read" | "write"; scope: "workspace" }>;
+  capabilityPolicies: WorkspaceCapabilityPolicies;
   outputLocale: "zh-CN" | "en-US";
-  step: "name" | "project" | "runner" | "output-locale" | "review";
+  step: "name" | "project" | "runner" | "permissions" | "output-locale" | "review";
   dirty: boolean;
+};
+
+type WorkspaceCapabilityPolicies = {
+  networkAccess: "allow" | "ask" | "deny";
+  externalProcessExecution: "allow" | "ask" | "deny";
+  writesOutsideWorkspace: "allow" | "ask" | "deny";
+  destructiveCommands: "allow" | "ask" | "deny";
+  externalPublish: "allow" | "ask" | "deny";
 };
 ```
 
@@ -353,12 +365,15 @@ type RunnerProbeResult = {
   status:
     | "probing"
     | "available"
-    | "missing"
-    | "incompatible"
-    | "needs_configuration"
+    | "not_installed"
+    | "installed_incompatible"
+    | "missing_configuration"
     | "unsupported_platform"
     | "probe_failed";
   version?: string;
+  adapterVersion: string;
+  supportedVersionRange: string;
+  authenticationStatus: "signed_in" | "signed_out" | "unknown" | "not_applicable";
   capabilities: string[];
   messageKey?: string;
 };
@@ -366,25 +381,41 @@ type RunnerProbeResult = {
 
 Rules:
 
-- `pi` is the recommended default when its result is `available`.
+- `pi` is the recommended default when its result is `available`; the first release also requires Codex CLI and Claude Code as official profiles. All three CLI installations and native logins are managed by the user.
 - Only `available` profiles can be selected for creation.
-- A probe failure is not silently converted to `missing`.
+- A probe failure is not silently converted to `not_installed`.
 - Results can resolve independently; a slow profile must not block completed profiles.
 - Secrets are never rendered or stored in the client form.
+- A profile is `available` only when it reports Session, Terminal, Context delivery, and the enforcement capabilities required by the current permission draft. Missing capability names appear in diagnostics, not as a selectable profile.
+- The draft starts with the documented permission defaults before the Runner step. Changing permissions later re-evaluates the selected Runner; if it no longer qualifies, keep the draft, clear only the Runner selection, and return the user to the Runner step with the exact missing capability.
 
-### 8.5 Output locale
+### 8.5 Permissions
+
+- The default profile is `workspace_write`.
+- The user can choose `read_only`, `selected_paths`, or `full_access`.
+- `selected_paths` uses the native directory picker and stores separate read/write grants. Workspace creation uses `workspace` scope; later Session/Run controls can add Attempt- or Run-scoped grants.
+- Network, external process execution, writes outside the Workspace, destructive commands, and external publishing each use `allow | ask | deny`.
+- Full access is visibly marked and does not disable secret redaction or attachment warnings.
+- The review step shows the resolved profile, selected paths, and capability policies without rendering secret values.
+
+The persistence and secret rules are defined in [m6-execution-workspace-security.md](m6-execution-workspace-security.md).
+
+### 8.6 Output locale
 
 - Show `zh-CN` and `en-US` with localized names.
 - Initial value may follow UI locale, but changing UI locale later does not mutate this draft.
 - The selected value becomes `defaultOutputLocale` only in the gateway command payload.
 
-### 8.6 Create command boundary
+### 8.7 Create command boundary
 
 ```ts
 type WorkspaceCreateInput = {
   name: string;
   projectPath: string;
   runnerProfileId: string;
+  permissionProfile: "read_only" | "workspace_write" | "selected_paths" | "full_access";
+  pathGrants: Array<{ path: string; access: "read" | "write"; scope: "workspace" }>;
+  capabilityPolicies: WorkspaceCapabilityPolicies;
   defaultOutputLocale: "zh-CN" | "en-US";
 };
 
@@ -501,7 +532,7 @@ Tasks are intentionally ordered. A task is not complete until its code, test, an
 | F1-07 | Implement shell regions | F1-02, F1-04 | Rail, context bar, canvas region, and conditional inspector meet dimensions and breakpoints |
 | F1-08 | Implement canvas viewport boundary | F1-07 | Loading, empty, unavailable, and injected projection states exist; viewport/selection are view-only |
 | F1-09 | Implement inspector shell | F1-07, F1-08 | Selection and Attention destinations open a stable inspector; close restores focus |
-| F1-10 | Implement Workspace creation flow | F1-04, F1-05 | Four-step validation flow, dirty-close confirmation, keyboard path, and locale expansion pass |
+| F1-10 | Implement Workspace creation flow | F1-04, F1-05 | Five-step validation flow with permissions, dirty-close confirmation, keyboard path, and locale expansion pass |
 | F1-11 | Implement Runner probe presentation | F1-10 | All probe statuses, retry, partial completion, and no-secret display are covered |
 | F1-12 | Implement gateway seam | F1-02, F1-10 | Production entry uses an unavailable gateway until Runtime is supplied; test adapter is injected only in tests |
 | F1-13 | Implement settings surface | F1-03, F1-05 | Theme, density, motion, contrast, and UI locale can change independently and persist |
@@ -510,7 +541,7 @@ Tasks are intentionally ordered. A task is not complete until its code, test, an
 | F1-16 | Bind platform preferences | F0 decision, F1-06 | Tauri adapter reads/writes the platform app-config directory and preserves the device-only schema |
 | F1-17 | Bind project directory selection | F0 decision, F1-10 | Native picker and path diagnostics implement the client capability without browser path workarounds |
 | F1-18 | Bind the selected Runtime gateway | F0 decision, F1-12 | Connection status, retry, diagnostics, and create command use the selected authenticated transport; no fixed port or old API route |
-| F1-19 | Wire desktop startup and shutdown | F1-16 through F1-18 | Bundled frontend follows the root state machine, owns only its Runtime process, and exits without stale child processes |
+| F1-19 | Wire desktop startup, tray, and shutdown | F1-16 through F1-18 | Closing the window keeps the supervised Runtime running in the tray; explicit quit safely pauses and exits without unowned child processes |
 | F1-20 | Complete F1-B desktop review | F1-19 | Tauri build/check, bundled-asset startup, failure/retry, preference path, directory picker, and shutdown evidence are recorded |
 
 ### 12.1 Implementation status
@@ -528,17 +559,19 @@ This table is the delivery ledger for the current F1 implementation. “Complete
 | F1-07 | complete | [1024 empty](evidence/f1-a/no-workspace-zh-light-1024.png), [1280 overlay](evidence/f1-a/inspector-overlay-en-dark-1280.png), and [1440 docked](evidence/f1-a/inspector-docked-zh-light-1440.png) screenshots |
 | F1-08 | complete | Typed Canvas viewport states, injected projection harness, and [ready Canvas](evidence/f1-a/workspace-created-en-light-1280.png) screenshot |
 | F1-09 | complete | Inspector selection/focus tests and overlay/docked screenshots |
-| F1-10 | complete | Four-step create flow, validation, dirty-close, failed-create preservation, and [failure screenshot](evidence/f1-a/workspace-create-failure-en-light-1280.png) |
-| F1-11 | complete | Incremental probe ordering, partial completion, availability gating, and no-secret rendering tests |
+| F1-10 | revision required | Earlier entry flow evidence remains; permission profile, selected-path, and five-capability controls are not implemented yet |
+| F1-11 | revision required | Earlier probe evidence remains; Session + Terminal + Context package supported-Runner qualification is not implemented yet |
 | F1-12 | complete | Production unavailable gateway, injected test gateway, cancellable operations, and entry-boundary test |
 | F1-13 | complete | Preference provider tests plus [live settings switch](evidence/f1-a/settings-zh-dark-compact-1280.png) |
 | F1-14 | complete | Playwright keyboard/focus smoke, reduced-motion runs, forced-colors styling, contrast tests, both locales, and 1024/1280/1440 screenshots |
-| F1-15 | complete | [F1-A implementation audit](reviews/F1-A-implementation-review-2026-08-18.md), final diff review, command matrix, and browser evidence |
-| F1-16 | blocked | Requires F0-selected platform preference location and desktop adapter |
-| F1-17 | blocked | Requires F0-selected native directory picker capability |
-| F1-18 | blocked | Requires F0-selected authenticated Runtime transport |
+| F1-15 | revision required | The 2026-08-18 [F1-A implementation audit](reviews/F1-A-implementation-review-2026-08-18.md) remains evidence for the shell baseline; permission selection and supported-Runner qualification require a new acceptance pass |
+| F1-16 | pending F0 verification | Requires F0-selected platform preference location and desktop adapter |
+| F1-17 | pending F0 verification | Requires F0-selected native directory picker capability |
+| F1-18 | pending F0 verification | Requires F0-selected authenticated Runtime transport |
 | F1-19 | blocked | Requires F1-16 through F1-18 |
 | F1-20 | blocked | Requires F1-B implementation and real Windows/macOS/Linux package evidence |
+
+F1-10 and F1-11 were completed against the earlier four-step entry contract. The current five-step permission contract and the Session/Terminal Runner qualification reopen their product acceptance; existing visual and lifecycle evidence remains valid only for unchanged behavior.
 
 ### 12.2 File ownership for implementation
 
@@ -593,7 +626,7 @@ F1-A passes only when all of the following are true:
 - The first screen is the new shell, not the prototype.
 - The shell can render every root state without stale business content.
 - Theme, density, motion, contrast, and UI locale are independent and persistent.
-- Workspace creation validates all four fields, preserves failed input, and never claims a Backend result it did not receive.
+- Workspace creation validates name, directory, Runner, permissions, and output locale, preserves failed input, and never claims a Backend result it did not receive.
 - The Runtime gateway is typed and replaceable; no F1 code depends on old M2-M5 routes.
 - The canvas remains the dominant surface and the inspector is conditional.
 - `zh-CN` and `en-US` pass expansion, no mixed-language, and keyboard checks.
@@ -610,7 +643,8 @@ F1 closes only after F1-A passes and F1-B also proves:
 - Project directory selection uses the native capability and returns actionable path failures.
 - Startup status and retry are driven by the Runtime shape selected in F0.
 - Production startup uses bundled frontend assets rather than a Vite server.
-- Shutdown terminates only the owned Runtime process tree and leaves no residual process.
+- Closing the window keeps the owned Runtime, active Runs, queue, and schedules alive in the system tray.
+- Explicit quit safely pauses active work, terminates only the owned Runtime process tree, and leaves no unowned process.
 - No fixed development port, repository path, `.venv`, or old M2-M5 API route appears in the production connection path.
 
 F1 closes the product shell and desktop connection foundation only. It does not close Backend packaging, Workflow editing, Run execution, or three-platform release.

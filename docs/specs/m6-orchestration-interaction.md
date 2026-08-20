@@ -1,6 +1,6 @@
 # M6 Orchestration Interaction
 
-**状态**：实施基线 v1（2026-08-18）
+**状态**：实施基线 v1（2026-08-20）
 
 **范围**：Workspace 创建、编排编辑、校验、保存、启动 Run 和桌面交互
 
@@ -36,7 +36,6 @@
 
 ```text
 commandId
-clientOperationId
 targetId
 expectedRevision? / expectedSequence?
 payload
@@ -74,6 +73,9 @@ workspaces | runs | attention | settings
 - 当前 Workspace、待处理 Attention 数量和连接状态必须可辨识。
 - 导航轨道不放 Runner 模式切换，不放大量运行按钮，不显示内部 ID。
 - 点击 Attention 入口后，系统完成 Workspace 切换、对象定位和检查器打开；如果目标 Run 已结束，打开只读历史上下文。
+- Workspace 提供 Files 入口；文件树属于 Workspace，Seat 检查器只提供 Activity、Changes 和 Artifacts 的过滤入口。
+- Active Seats 是运行实例投影，支持按 Organization、Run、Origin 和 Status 分组；派生 worker 必须显示父 AgentInstance、父 Attempt 和创建原因。
+- 从 Attention、Seat、Task 或 Artifact 打开 Diff 时，中央区域切换为检查视图，保留来源上下文；关闭后恢复原画布位置和选择。
 
 ### 2.3 Workspace 顶部上下文
 
@@ -94,7 +96,8 @@ Runner 只在 Workspace 设置、节点高级配置和启动预览中出现，�
 1. 名称
 2. 项目目录
 3. 默认 Runner
-4. Agent 输出语言
+4. 权限与可访问目录
+5. Agent 输出语言
 
 每一步保存临时表单状态，只有最后的“创建 Workspace”命令会写入 `WorkspaceConfig`。
 
@@ -116,7 +119,7 @@ Runner 只在 Workspace 设置、节点高级配置和启动预览中出现，�
 打开 Runner 步骤后立即开始探测。探测项状态为：
 
 ```text
-probing | available | missing | incompatible | needs_configuration | unsupported_platform | probe_failed
+probing | available | not_installed | installed_incompatible | missing_configuration | unsupported_platform | probe_failed
 ```
 
 - `pi` 是默认推荐项；若有可用 Profile，默认选中它。
@@ -125,14 +128,29 @@ probing | available | missing | incompatible | needs_configuration | unsupported
 - 没有可用 Profile 时不能完成 Workspace 创建；提供“重新探测”和“打开配置”而不是伪造可用状态。
 - 探测超时不阻塞其它 Runner 的结果；只要用户选中的 Profile 已完成探测并可用，就可以提交选择。
 - 创建成功后只保存 Profile 引用和非秘密设置，秘密值由设备安全存储管理。
+- Runner 只有同时提供 Session、原样 Terminal 和 Context package 投递时才能标记为 `available`；缺少任一能力时显示具体原因，不进入正式选择。
+- 绑定 Dispatcher Task 的 Runner 必须提供 `workspaceDispatch` 和 request dedupe；任何允许 Agent 自行派生 worker 的 Task，其 Runner 必须同时提供 `transientSpawn`、`workspaceDispatch` 和 request dedupe，因为父 Agent 负责回答自己 worker 的目录 SelectionRequest。
+- 表单进入 Runner 步骤前已经加载默认权限。后续权限变更会重新校验已选 Runner；不再满足时只清除 Runner 选择，并定位回该步骤显示缺失能力。
 
-### 3.5 Agent 输出语言
+### 3.5 权限与可访问目录
+
+- 默认选择 `workspace_write`，允许读取和写入项目目录。
+- 用户可以切换 `read_only`、`selected_paths` 或 `full_access`。
+- `selected_paths` 使用平台原生目录选择器添加一个或多个目录，并为每项选择 read 或 write。
+- 网络、外部进程、Workspace 外写入、破坏性命令和外部发布分别选择 `allow | ask | deny`。
+- 默认允许网络和外部进程，拒绝 Workspace 外写入，破坏性命令和外部发布需确认。
+- `full_access` 持续显示高权限标记和范围摘要，但不反复要求审批；用户可以在 Workspace 设置中收紧。
+- 目录选择和权限摘要进入创建确认页。密钥文件默认不进入搜索、附件和自动上下文。
+
+完整权限与秘密规则见 [m6-execution-workspace-security.md](m6-execution-workspace-security.md)。
+
+### 3.6 Agent 输出语言
 
 - 初始选项至少为 `zh-CN` 和 `en-US`，默认取设备 UI Locale，但用户可以独立选择。
 - 该选择写入 `WorkspaceConfig.defaultOutputLocale`，不改变设备 UI Locale。
 - Run 启动前可以在不修改 Workspace 默认值的情况下为本次 Run 选择其它输出语言。
 
-### 3.6 创建结果
+### 3.7 创建结果
 
 创建命令成功后按以下顺序完成：
 
@@ -210,9 +228,12 @@ start | task | gate | join | end
 ```
 
 - `start` 和至少一个 `end` 由流程骨架提供；用户不能创建第二个入口。
+- 每个 End 必须选择明确的 **Succeeded** 或 **Failed** outcome；Failed End 还必须填写稳定 result code。默认骨架只创建一个 Succeeded End。
 - 新建 Task 必须选择 owner Seat；禁用 Seat 不出现在可选列表中。
 - 新建 Gate 必须选择 `approval` 或 `question`，并配置允许动作；首版 Gate 固定为阻塞。
 - 新建 Join 必须选择 `all` 或 `any`，并连接至少两个并行来源。
+- 当 Workflow 有多个 formal Task 时，用户必须在 Workflow 设置中指定一个 Dispatcher Task。它仍是普通 Task，业务 Attempt 可以正常完成；其已启动 formal AgentInstance 通过 Runtime 签发的 Run-scoped DispatcherCoordinationLease 继续承担其它 formal Task 的目录协调。transient worker 由发起 spawn 的父 Agent 通过当前 Attempt channel 分发。
+- Dispatcher Task 必须可从 Start 到达，且不能依赖它负责分发的下游 Task。删除或禁用时必须先选择替代 Dispatcher。
 - 不提供任意脚本节点、自由表达式条件或隐藏的自动化分支。
 
 ### 6.2 连接
@@ -222,7 +243,7 @@ start | task | gate | join | end
 | 来源 | 允许 trigger |
 |---|---|
 | Start | `always` |
-| Task | `success`, `failure` |
+| Task | `success`, `failure`, `skipped`（仅 Optional Task） |
 | Approval Gate | `approved`, `rejected` |
 | Question Gate | `answered` |
 | Join | `always` |
@@ -231,6 +252,7 @@ start | task | gate | join | end
 - 从节点端口创建 Transition，释放时只显示该节点允许的 trigger。
 - 连接 Task 到 Task 时，系统要求确认输出 Artifact Contract 与下游 Input Binding；缺少契约时先标记阻塞错误。
 - Gate 的出边 trigger 必须与 Gate action 一一对应：`approved`、`rejected` 或 `answered`。
+- `continue_optional` 必须存在至少一条 `skipped` 出边；非 Optional Task 不显示该端口。
 - Join 只接受分支输入，不允许绕过 Join 把并行分支隐式合并。
 - 删除 Transition 时保留两端节点，显示受影响的输入和可达性校验结果。
 
@@ -315,12 +337,14 @@ valid | warning | blocking_error
 
 点击“开始 Run”时执行完整校验，至少检查：
 
-- 唯一 Start、可达 End、无不可达节点。
+- 唯一 Start、至少一个可达 Succeeded End、所有 Failed End 有 result code，且无不可达节点。
 - 所有 Task owner Seat、Role、Runner capability 引用有效。
 - 必填 Input 有来源，Contract 无悬空引用。
+- 多 formal Task Workflow 有可从 Start 到达的 Dispatcher Task；spawn-capable Task 的 Runner 同时满足 spawn 和目录选择能力。
 - Gate action、Transition trigger、Join policy 一致。
+- Optional Task 的 `continue_optional`/`skip_optional` 有显式 `skipped` Transition，非 Optional Task 没有该 trigger。
 - 无普通环，Rework 有上限。
-- 当前设备有可用 Runner Profile，项目目录可访问。
+- 当前设备有 installation 可用、且对 Workspace policy/required capabilities 为 qualified 的 Runner Profile，项目目录可访问。
 
 完整校验未通过时不创建 RunSnapshot，并将焦点移动到最高优先级错误。
 
@@ -335,12 +359,23 @@ orchestration version
 project root
 resolved Runner per Task
 output locale
+allowed execution workspace modes
+root Dispatcher bootstrap mode
+spawn policy and budgets
+resolved permission summary
+result integration policy
 required capabilities
 blocking warnings/errors
 ```
 
 - Runner 解析遵循 `Task override > Seat override > Workspace default`，并显示解析来源。
 - 输出语言默认使用 Workspace 值，但本次选择只写入 RunSnapshot。
+- 分发 Agent 在实际派发时选择共享目录、Git worktree 或临时隔离目录；启动预览显示允许模式和默认建议，用户可以限制可选范围。
+- 根 Dispatcher 默认从共享 Workspace 启动，因为它还没有上游 Agent；用户可在启动预览覆盖这一次 bootstrap assignment。
+- 派生默认 `auto`，同时显示 Workspace 活动实例 4、单父实例子 worker 2、深度 2、单 Run 原始实例谱系 8、每条谱系恢复代次 3 的默认预算；用户可以为本次 Run 覆盖。
+- 启动预览显示 transient worker 可显式选择的 Runner Profile allow-list；省略时继承父 Profile。Run 启动后加入未冻结 Profile 必须形成 Amendment。
+- `full_access`、外部发布为 allow 或包含 Workspace 外可写目录时，确认页显示明确权限摘要。
+- 隔离目录结果默认 `review` 后使用 **Apply result**；用户可以为本次 Run 改为 `auto_if_clean` 或 `manual`。
 - 用户输入作为 `runInput` 进入 Snapshot；空输入是否允许由流程配置决定。
 
 ### 10.2 创建与进入运行态
@@ -350,7 +385,7 @@ blocking warnings/errors
 1. 执行完整校验。
 2. 创建不可变 `OrchestrationVersion`。
 3. 深拷贝生成 `RunSnapshot`，冻结 Runner、项目目录、输出语言和编排内容。
-4. 创建 Run 并提交 `clientOperationId`。
+4. 创建 Run 并提交唯一的 `commandId`。
 5. Runtime 返回初始序列后，进入只读运行画布。
 
 任何一步失败都保留 Draft，允许用户修复后再次启动；已创建但未启动的 Run 只能进入清理流程，不能复用旧 Snapshot 猜测新配置。
@@ -362,13 +397,51 @@ blocking warnings/errors
 - 运行中的编辑按钮隐藏或置为“创建 Amendment”，不能直接改 Snapshot。
 - 点击 Seat、Task、Handoff 或 Artifact 打开检查器，详情来自 RunSnapshot 和 RuntimeState 的明确来源。
 
+### 10.4 Agent Session 与 Terminal
+
+- 点击 Active Seats 中的 AgentInstance 或运行画布中的活动 Seat，中央区域打开该实例的 Session。
+- Session 展示对话、结构化 Activity、当前 Task/Attempt、运行控制、Changes、Artifact 和 Attention；不是终端文本的美化副本。
+- Terminal 在同一位置作为另一个视图，连接同一个 AgentInstance 和 Runner process handle，支持 CLI 原生 ANSI、键盘、选择器和 `/` 命令。
+- Session 与 Terminal 切换不能重启 CLI 或创建新 Attempt。Terminal 接管键盘时，Session 不得同时向同一 PTY 写入。
+- Ensemble 首版不提供 CLI slash command 推荐或自动发现；Runner 原生命令只在 Terminal 中呈现。
+- Session 消息的实时投递受 Runner capability 约束；不支持时明确进入下一次 Attempt，不能显示为当前实例已接收。
+- Session 是长期 Seat 入口，可以跨多个 Direct Task/Run 自由对话；每条消息仍显示并绑定当前 Task/Run。
+- 消息可附加文件、选中的 Diff 行、交付结果、Task 或 Attention；发送前显示目标、权限和版本摘要。
+- 正式 supported Runner 必须同时提供 Session 和 Terminal。CLI 无法让两者绑定同一进程时，不出现在可用 Runner 列表。
+
+详细语义见 [m6-agent-session-collaboration.md](m6-agent-session-collaboration.md)。
+
+### 10.5 加入队列与创建计划
+
+编排通过校验并创建不可变 OrchestrationVersion 后，启动预览提供三个明确动作：
+
+```text
+Run now
+Add to queue
+Create schedule
+```
+
+- **Add to queue** 将当前启动预览的编排版本、输入、Runner Profile 绑定、transient Profile allow-list、输出语言和 ExecutionPolicyVersion 冻结为 RunLaunchSpec，再创建持久化队列项；关闭窗口后仍可启动。
+- **Create schedule** 打开轻量设置面板。Cron 使用五字段、分钟粒度表达式和 IANA timezone；Interval 使用至少 60 秒的间隔与 UTC anchor。面板同时包含错过执行策略、重叠策略和后台预授权摘要。
+- 默认错过执行策略为“只补最新一次”，默认重叠策略为“保留最新一个待运行项”。高级设置可以选择跳过、全部补跑或允许并行，并显示补跑上限。
+- 计划只能引用刚创建或已经保存的 OrchestrationVersion。Draft 后续修改不会静默改变计划；用户需要显式更新计划到新版本。
+- 创建计划时把编排版本、输入、Runner Profile 绑定和非敏感配置、输出语言及不可变 ExecutionPolicyVersion 冻结为 ScheduleLaunchTemplate。Workspace 默认值后续变化不会静默改变计划；收紧 Workspace policy 仍会在触发时限制旧计划。
+- 权限面板只允许等于或收紧 Workspace policy，并保存带 digest 的 ExecutionPolicyVersion。增加目录、网络、外部进程、破坏性命令或外部发布权限时，需要用户显式确认并创建新的 policy version 和 ScheduleLaunchTemplate。
+- 首版不显示文件变化、Webhook 或 API 触发选项。
+
+Runs 视图提供 **Queue** 和 **Schedules** 两个标签。Queue 可以查看来源、冻结版本、等待原因，并对尚未创建 Run 的项调整顺序或取消；Schedules 可以查看下一次运行、上次结果、来源版本和阻塞原因，执行启用、禁用、立即运行、编辑和归档。归档停止未来触发，但保留计划、已经创建的队列项、Run 和历史 fire。
+
+关闭主窗口时应用进入托盘，画布状态落盘但 Run 不暂停。首版托盘只提供 **Open Ensemble** 和 **Quit Ensemble**；Pause/Resume 在具体 Run 中操作。有活动 Run 时选择 Quit 显示摘要，默认 **Pause safely and quit**。只有 Runtime 确认安全暂停的 Run 才设置 `resumeOnStartup=false`；强制终止、系统注销、关机或异常中断的 Run 按风险恢复策略处理。
+
+后台产生 Attention 时发送脱敏系统通知。点击通知必须按 scope 直接打开对应 Workspace、Run 或 Queue Item，以及 Attention；没有 Client 连接时，审批保持等待，不自动批准或拒绝。
+
 ## 11. 空、加载和错误状态
 
 | 状态 | 主界面行为 | 可操作动作 |
 |---|---|---|
 | 空 Workspace | 画布保留最小工作面 | 创建单 Agent、导入模板、打开设置 |
 | 空组织 | 组织视图显示一个新建入口 | 新建 Role、Seat 或 Group |
-| 空流程 | 流程视图显示 Start 到 End 骨架 | 新建 Task 或套用模板 |
+| 空流程 | 流程视图显示 Start 到 Succeeded End 骨架 | 新建 Task 或套用模板 |
 | 加载中 | 保留导航上下文，不显示假数据 | 取消加载（若支持）、重试 |
 | Runtime 不可用 | 组织和 Draft 仍可编辑 | 重试连接、查看诊断，启动按钮禁用 |
 | 保存失败 | 保留内存修改并固定提示 | 重试、另存副本、放弃修改 |
@@ -385,6 +458,11 @@ blocking warnings/errors
 | `Cmd/Ctrl+S` | 立即保存 Draft |
 | `Cmd/Ctrl+Z` | 撤销 |
 | `Cmd/Ctrl+Shift+Z` | 重做 |
+| `Cmd/Ctrl+K` | 全局搜索 |
+| `Cmd/Ctrl+Enter` | 发送 Session 消息 |
+| `Shift+Enter` | Session 消息换行 |
+| `Cmd/Ctrl+Shift+T` | 切换当前 AgentInstance 的 Session / Terminal |
+| `Cmd/Ctrl+Shift+A` | 附加文件、Diff、交付结果、Task 或 Attention |
 | `Delete` / `Backspace` | 删除当前选择，若有引用则先显示影响 |
 | `F` | 适配当前选择或活动路径 |
 | `Enter` | 激活当前焦点或进入编辑 |
@@ -405,6 +483,9 @@ blocking warnings/errors
 - 启动后修改 Workspace 默认 Runner、UI Locale 或 Draft 不影响已启动 Run。
 - `zh-CN`、`en-US`、浅色、深色、减少动态和高 DPI 下，控件结构和操作位置保持稳定。
 - 关键动作在 Windows、macOS、Linux 的键盘、目录选择和窗口环境下都能完成。
+- 三种执行目录、四种权限档位、派生审批、实例预算和恢复代次均能在启动前查看并配置。
+- 用户能把不可变编排版本加入持久化队列或创建计划，并明确看到时区、补跑、重叠和后台预授权。
+- 关闭窗口后 Run 和计划继续；托盘显式退出与系统注销/崩溃使用不同的自动恢复语义。
 
 ## 14. 实施约束
 

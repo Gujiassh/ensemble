@@ -17,7 +17,7 @@
 
 ## Result
 
-**ACCEPT** after the fixes recorded below. F1-01 through F1-14 have implementation and evidence. F1-15 closes with this report and the final verification matrix. F1-16 through F1-20 remain blocked by the F0 Backend and packaging decision.
+**ACCEPT** after the fixes recorded below. F1-01 through F1-14 have implementation and evidence. F1-15 closes with this report and the final verification matrix. F1-16 through F1-20 remain pending F0 Backend and packaging verification.
 
 ## Findings Resolved
 
@@ -47,7 +47,7 @@ The root `.gitignore` is the only scope exception to the F1-A file-ownership lis
 | Internationalization | pass | Catalog coverage, pseudo-locale helper, `Intl` formatter tests, English and Chinese browser flows, and independent output-locale assertions pass. |
 | Raw color/platform leakage | pass | Raw-color scan passes; only theme definitions contain hex values; no platform sniffing or Runtime URL is present in Canvas source. |
 | Production boundary | pass | `App.entry.test.ts` and production bundle scan confirm no fixtures, test gateway, or visual harness in the production entry/bundle. |
-| F1-B desktop/runtime binding | blocked | Native preference path, directory picker, authenticated Runtime gateway, sidecar lifecycle, and package evidence require F0 decisions. |
+| F1-B desktop/runtime binding | pending F0 verification | Native preference path, directory picker, authenticated Runtime gateway, sidecar lifecycle, and package evidence require F0 decisions. |
 
 ## Verification Evidence
 

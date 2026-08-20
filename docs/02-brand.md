@@ -49,11 +49,11 @@
 | Role | 画布中的具体 Agent 实例 |
 | Seat | Role 模板本身 |
 | Group | 任意 Workflow 分段或 Workspace |
-| Handoff | 无含义的动画连线 |
+| 交给下一任务 / 已交接 | 直接显示内部对象名 Handoff |
 | Attention | 所有事项都叫通知 |
 | Inspector | 永久详情栏或卡片墙 |
 | Run | Workspace 或编排模板 |
-| Artifact | 任意日志文本 |
+| 交付结果 / Deliverable | 直接显示内部对象名 Artifact，或把任意日志当成交付结果 |
 
 单 Agent 是完整使用路径，不称为降级模式。
 
