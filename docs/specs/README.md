@@ -14,6 +14,7 @@
 | [m6-events-commands.md](m6-events-commands.md) | M6 Events and Commands Contract | **CURRENT · Implementation baseline** |
 | [m6-local-runtime-scheduling.md](m6-local-runtime-scheduling.md) | M6 Local Runtime, Tray, Scheduling, and Recovery | **CURRENT · Product and architecture baseline; Spike evidence pending** |
 | [m6-platform-packaging.md](m6-platform-packaging.md) | M6 Cross-Platform Packaging Spike | **CURRENT · Spike spec** |
+| [f0-a-runtime-lifecycle.md](f0-a-runtime-lifecycle.md) | F0-A Runtime Lifecycle and Owner Acceptance | **CURRENT · F0-A1 SPEC READY · IMPLEMENTATION PAUSED** |
 | [f1-shell-design-system.md](f1-shell-design-system.md) | F1 Desktop Shell, Design System, and Workspace Entry | **CURRENT · Implementation spec** |
 | [m1-canvas-mock.md](m1-canvas-mock.md) | M1 Canvas Mock | Historical |
 | [m2-workspace-events.md](m2-workspace-events.md) | M2 Workspace + Events | Historical |

@@ -38,6 +38,9 @@
 - [x] 冻结 End/Optional/Join、TaskExecution、DispatcherCoordinationLease、SpawnRequest、Run Amendment、Direct Task、AttemptLaunch、RunnerResult、目录选择、权限审批、capacity、历史 tombstone 和 cancel cleanup 协议
 - [x] 完成 M6 Runtime Critical 级独立终审并关闭全部 High/Medium finding
 - [ ] 完成所选进程形态的三平台 Spike，包括 per-data-root 单实例 lock、第二实例激活、Attempt/Coordination 两阶段 launch 崩溃窗口、按 launch/registration 终止、safe-shutdown 两阶段收敛和 crash 回收
+- [ ] F0-A1 Rust Runtime Bootstrap：规格已冻结，实现已按用户要求暂停；等待用户重新授权后再完成独立二进制、authenticated loopback、canonical data-root datastore lock，并进入主控审计与用户验收
+- [ ] F0-A2 Tauri Supervisor：per-data-root Shell ownership、第二实例激活、托盘与显式退出；仅在用户验收 F0-A1 后开始
+- [ ] F0-A3 Windows/WSL Lifecycle Proof：原生进程树回收和实证写回；仅在用户验收 F0-A2 后开始
 
 关闭条件：
 
