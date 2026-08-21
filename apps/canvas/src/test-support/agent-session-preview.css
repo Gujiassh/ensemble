@@ -1,0 +1,76 @@
+.dui-session { display: grid; grid-template-columns: minmax(0, 1fr) 276px; overflow: hidden; }
+.dui-session-thread { display: flex; min-width: 0; min-height: 0; flex-direction: column; background: var(--dui-main); }
+.dui-session-heading { display: flex; align-items: center; min-height: 70px; gap: 10px; padding: 0 18px; border-block-end: 1px solid var(--dui-line); }
+.dui-session-avatar { display: grid; flex: 0 0 auto; place-items: center; width: 38px; height: 38px; border-radius: 11px; color: var(--color-text-on-primary); font-size: 12px; font-weight: 700; background: var(--color-status-active); }
+.dui-session-avatar--success { background: var(--color-status-success); }
+.dui-session-avatar--waiting { color: var(--dui-strong); background: var(--color-status-waiting); }
+.dui-session-heading > div:nth-child(2) { min-width: 0; flex: 1; }
+.dui-session-name { display: flex; align-items: center; gap: 8px; }
+.dui-session-name strong { font-size: 13px; }
+.dui-session-name span { display: inline-flex; align-items: center; gap: 4px; color: var(--color-status-success); font-size: 9px; }
+.dui-session-heading p { margin: 3px 0 0; color: var(--dui-muted); font-size: 10px; }
+.dui-session-controls { display: flex; align-items: center; gap: 8px; }
+.dui-session-controls > span { color: var(--dui-muted); font-family: var(--font-mono); font-size: 9px; }
+.dui-session-controls button { display: inline-flex; align-items: center; min-height: 29px; gap: 6px; padding: 0 9px; border: 1px solid var(--dui-line); border-radius: 5px; color: var(--dui-strong); font-size: 10px; background: var(--dui-subtle); cursor: pointer; }
+.dui-session-feed { min-height: 0; flex: 1; overflow: auto; padding: 16px clamp(18px, 4vw, 54px) 24px; }
+.dui-session-date { display: flex; align-items: center; gap: 10px; margin: 4px 0 15px; color: var(--dui-muted); font-size: 9px; text-transform: uppercase; }
+.dui-session-date::before, .dui-session-date::after { height: 1px; flex: 1; background: var(--dui-line); content: ""; }
+.dui-session-event { display: flex; align-items: center; min-height: 48px; gap: 10px; margin: 8px 0 8px 46px; padding: 7px 9px; border-block: 1px solid var(--dui-line); color: var(--dui-strong); }
+.dui-session-event--system { margin-top: 0; color: var(--dui-muted); background: var(--dui-subtle); border: 0; }
+.dui-session-event-icon { display: grid; flex: 0 0 auto; place-items: center; width: 27px; height: 27px; border-radius: 7px; color: var(--dui-accent); background: var(--dui-selected); }
+.dui-session-event > div { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
+.dui-session-event strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.dui-session-event small, .dui-session-event time { color: var(--dui-muted); font-size: 9px; }
+.dui-session-event-state { display: inline-flex; align-items: center; gap: 4px; color: var(--color-status-success); font-size: 9px; }
+.dui-session-event > button { display: inline-flex; align-items: center; gap: 2px; padding: 5px; border: 0; color: var(--dui-accent); font-size: 9px; background: transparent; cursor: pointer; }
+.dui-session-message { display: flex; align-items: flex-start; gap: 10px; padding: 12px 0; }
+.dui-session-message-avatar { display: grid; flex: 0 0 auto; place-items: center; width: 36px; height: 36px; border-radius: 10px; color: var(--color-text-on-primary); font-size: 11px; font-weight: 700; background: var(--color-status-active); }
+.dui-session-message-avatar.is-you { background: var(--dui-accent); }
+.dui-session-message-body { min-width: 0; flex: 1; }
+.dui-session-message-body header { display: flex; align-items: baseline; gap: 7px; }
+.dui-session-message-body strong { font-size: 12px; }
+.dui-session-message-body time { color: var(--dui-muted); font-size: 9px; }
+.dui-session-message-body p { max-width: 720px; margin: 5px 0 0; color: var(--dui-strong); font-size: 11px; line-height: 1.6; }
+.dui-session-message--you .dui-session-message-body p { color: var(--dui-muted); }
+.dui-session-command { margin: 10px 0 10px 46px; border: 1px solid var(--dui-line); border-radius: 6px; overflow: hidden; }
+.dui-session-command-heading { display: flex; align-items: center; width: 100%; min-height: 51px; gap: 9px; padding: 7px 9px; border: 0; color: var(--dui-strong); text-align: start; background: var(--dui-subtle); cursor: pointer; }
+.dui-session-command-heading > span:nth-child(2) { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
+.dui-session-command-heading strong { overflow: hidden; font-family: var(--font-mono); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.dui-session-command-heading small { color: var(--dui-muted); font-size: 9px; }
+.dui-session-command-status { display: inline-flex !important; flex: 0 0 auto !important; flex-direction: row !important; align-items: center; gap: 4px !important; color: var(--color-status-success); font-size: 9px; }
+.dui-session-command-heading[aria-expanded="true"] > svg:last-child { transform: rotate(180deg); }
+.dui-session-terminal { max-height: 230px; margin: 0; overflow: auto; padding: 13px 15px; color: var(--color-text-navigation); font-family: var(--font-mono); font-size: 10px; line-height: 1.65; background: var(--color-navigation-background); }
+.dui-session-terminal span { color: var(--color-status-danger); }
+.dui-session-typing, .dui-session-paused { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; color: var(--color-status-active); font-size: 9px; }
+.dui-session-typing i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; animation: dui-session-dot 1.2s infinite ease-in-out; }
+.dui-session-typing i:nth-child(2) { animation-delay: .15s; }.dui-session-typing i:nth-child(3) { animation-delay: .3s; }
+.dui-session-paused { color: var(--color-status-waiting); }
+@keyframes dui-session-dot { 0%, 65%, 100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
+.dui-session-composer { display: flex; align-items: flex-end; min-height: 58px; gap: 7px; margin: 0 clamp(14px, 3vw, 42px) 18px; padding: 8px; border: 1px solid var(--dui-line); border-radius: 7px; background: var(--dui-subtle); box-shadow: 0 8px 26px color-mix(in srgb, var(--color-text-primary) 6%, transparent); }
+.dui-session-composer > button { display: grid; flex: 0 0 auto; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 5px; color: var(--dui-muted); background: transparent; cursor: pointer; }
+.dui-session-composer textarea { align-self: center; min-width: 0; max-height: 90px; flex: 1; resize: none; border: 0; outline: 0; color: var(--dui-strong); font: 11px/1.5 inherit; background: transparent; }
+.dui-session-composer textarea::placeholder { color: var(--dui-muted); }
+.dui-session-context { align-self: center; color: var(--dui-muted); font-size: 9px; white-space: nowrap; }
+.dui-session-composer .dui-session-send { color: var(--color-text-on-primary); background: var(--dui-accent); }
+.dui-session-composer .dui-session-send:disabled { opacity: .38; cursor: default; }
+.dui-session-context-panel { min-width: 0; min-height: 0; overflow: auto; color: var(--dui-strong); background: var(--dui-subtle); border-inline-start: 1px solid var(--dui-line); }
+.dui-session-context-heading { display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 14px; border-block-end: 1px solid var(--dui-line); color: var(--dui-muted); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.dui-session-context-section { padding: 17px 14px; border-block-end: 1px solid var(--dui-line); }
+.dui-session-context-label { display: block; margin-bottom: 9px; color: var(--dui-muted); font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.dui-session-context-section h3 { margin: 0; font-size: 12px; }
+.dui-session-context-section p { margin: 6px 0 12px; color: var(--dui-muted); font-size: 9px; line-height: 1.5; }
+.dui-session-progress { height: 3px; overflow: hidden; background: var(--dui-line); }
+.dui-session-progress span { display: block; height: 100%; background: var(--dui-accent); }
+.dui-session-progress-meta { display: flex; justify-content: space-between; margin-top: 7px; color: var(--color-status-active); font-size: 9px; }
+.dui-session-progress-meta strong { color: var(--dui-muted); font-weight: 500; }
+.dui-session-plan-item { display: flex; align-items: center; min-height: 29px; gap: 7px; color: var(--dui-muted); font-size: 10px; }
+.dui-session-plan-item.is-done svg { color: var(--color-status-success); }.dui-session-plan-item.is-active { color: var(--dui-strong); }.dui-session-plan-item.is-active svg { color: var(--color-status-active); }
+.dui-session-plan-dot { width: 6px; height: 6px; margin-inline: 4px 3px; border-radius: 50%; background: var(--dui-line); }
+.dui-session-context-link { display: flex; align-items: center; width: 100%; min-height: 45px; gap: 8px; padding: 6px 0; border: 0; border-block-end: 1px solid var(--dui-line); color: var(--dui-strong); text-align: start; background: transparent; cursor: pointer; }
+.dui-session-context-link > svg:first-child { color: var(--dui-accent); }
+.dui-session-context-link > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.dui-session-context-link strong { font-size: 10px; }.dui-session-context-link small { color: var(--dui-muted); font-size: 9px; }
+.dui-session-context-section--runtime dl { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; margin: 0; font-size: 9px; }
+.dui-session-context-section--runtime dt { color: var(--dui-muted); }.dui-session-context-section--runtime dd { margin: 0; color: var(--dui-strong); font-family: var(--font-mono); }
+@media (max-width: 1040px) { .dui-session { grid-template-columns: minmax(0, 1fr) 230px; }.dui-session-feed { padding-inline: 18px; } }
+@media (max-width: 760px) { .dui-session { grid-template-columns: minmax(0, 1fr); }.dui-session-context-panel { display: none; }.dui-session-controls > span, .dui-session-context { display: none; }.dui-session-event, .dui-session-command { margin-left: 0; } }

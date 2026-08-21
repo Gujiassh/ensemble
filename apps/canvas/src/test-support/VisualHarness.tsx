@@ -1,6 +1,7 @@
 import { AppShell } from "../app-shell/AppShell";
 import type { CanvasViewportState } from "../canvas/types";
 import type { DevicePreferences, UiLocale } from "../preferences/schema";
+import { DiscordUiPreview } from "./DiscordUiPreview";
 import {
   createUnavailableGateway,
   type WorkspaceGateway,
@@ -9,7 +10,7 @@ import {
 import { createTestGateway } from "./gateway";
 import { TestProviders } from "./TestProviders";
 
-type VisualScenario = "startup-error" | "no-workspace" | "create-failure" | "ready";
+type VisualScenario = "startup-error" | "no-workspace" | "create-failure" | "ready" | "ui-preview";
 
 type VisualHarnessProps = {
   params: URLSearchParams;
@@ -28,7 +29,8 @@ function readScenario(params: URLSearchParams): VisualScenario {
   if (
     value === "no-workspace" ||
     value === "create-failure" ||
-    value === "ready"
+    value === "ready" ||
+    value === "ui-preview"
   ) {
     return value;
   }
@@ -99,6 +101,15 @@ function projectionForWorkspace(workspace: WorkspaceSummary): CanvasViewportStat
 
 export function VisualHarness({ params }: VisualHarnessProps) {
   const scenario = readScenario(params);
+  if (scenario === "ui-preview") {
+    return (
+      <div className="app-root">
+        <TestProviders preferences={readPreferences(params)}>
+          <DiscordUiPreview />
+        </TestProviders>
+      </div>
+    );
+  }
   const gateway = createScenarioGateway(scenario);
 
   return (
