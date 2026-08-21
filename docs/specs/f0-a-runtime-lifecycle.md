@@ -2,8 +2,8 @@
 
 **Date**: 2026-08-20
 **Risk class**: Critical
-**Overall status**: F0-A1 OWNER ACCEPTED / ACCEPTED · F0-A2 AUTHORIZED NEXT AFTER DELIVERY PUSH
-**Current slice**: F0-A1 Rust Runtime Bootstrap implementation and owner verdicts ACCEPT; F0-A1 is OWNER ACCEPTED; F0-A2 is authorized to start after the acceptance/delivery status commit is pushed
+**Overall status**: F0-A1 OWNER ACCEPTED / ACCEPTED · F0-A2 AUTHORIZED / ACTIVE NEXT
+**Current slice**: F0-A1 Rust Runtime Bootstrap implementation and owner verdicts ACCEPT; F0-A1 is OWNER ACCEPTED; the acceptance/delivery status commit is pushed and F0-A2 is authorized to start now
 
 ## 1. Purpose
 
@@ -22,7 +22,7 @@ Engineering completion is not owner acceptance. A later slice must not silently 
 | Slice | Deliverable | Status | Start condition |
 |---|---|---|---|
 | F0-A1 | Independent Rust Runtime bootstrap, authenticated loopback health, canonical data-root ownership, and datastore lock | OWNER ACCEPTED / ACCEPTED | Closed |
-| F0-A2 | Electron Supervisor/Security Bridge: Security-owned BrowserWindow/external confirm, closed activation, Workspace-create commandId/selection binding, exact byte-credit streams, and signed sidecar | AUTHORIZED NEXT | Acceptance/delivery status commit pushed; own technical/review gates remain mandatory |
+| F0-A2 | Electron Supervisor/Security Bridge: Security-owned BrowserWindow/external confirm, closed activation, Workspace-create commandId/selection binding, exact byte-credit streams, and signed sidecar | AUTHORIZED / ACTIVE NEXT | May start now; own technical/review/evidence/quality/delivery gates remain mandatory |
 | F0-A3 | Windows/macOS/Linux Electron+Runtime lifecycle, final-binary fuse readback, signing/update/uninstall, closed activation/log proof, and installed-app IME/a11y matrix | PENDING | Owner accepts F0-A2 |
 
 Windows, macOS, and Linux Electron lifecycle evidence belongs to F0-A3. It does not change any F0-A1 Runtime contract or authorize F0-A1 implementation.
@@ -147,4 +147,4 @@ Current implementation evidence:
 - independent Critical review: [**ACCEPT**](reviews/F0-A1-runtime-implementation-review-2026-08-21.md)
 - owner acceptance: [**ACCEPT**](reviews/F0-A1-owner-acceptance-2026-08-21.md); F0-A1 is OWNER ACCEPTED
 
-Owner acceptance authorizes F0-A2 as the next phase after this acceptance/delivery status commit is pushed. Windows/macOS platform proof and every later technical/review/quality gate remain mandatory.
+The acceptance/delivery status commit is pushed; F0-A2 is authorized and may start now. Windows/macOS platform proof and every later technical/review/quality gate remain mandatory.

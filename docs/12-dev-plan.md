@@ -1,6 +1,6 @@
 # Ensemble V2 Development Plan
 
-**状态**：当前执行计划（2026-08-21）· F0-A1 OWNER ACCEPTED · F0-A2为下一授权阶段 · 后续阶段受门禁约束
+**状态**：当前执行计划（2026-08-21）· F0-A1 OWNER ACCEPTED · F0-A2为当前已授权阶段 · 后续阶段受门禁约束
 **产品目标**：优雅、简约的桌面界面，以及灵活、可干预的 Agent 编排
 **原则**：先完成契约和架构，再写业务代码；每个阶段都以可验证交付物关闭
 
@@ -23,7 +23,7 @@
 
 ### F0 · 文档与架构基线（当前）
 
-**实施状态**：F0-A1 Rust Runtime Bootstrap 已实现，[独立 Critical 实现审查](specs/reviews/F0-A1-runtime-implementation-review-2026-08-21.md)为 **ACCEPT**，且[产品负责人验收](specs/reviews/F0-A1-owner-acceptance-2026-08-21.md)为 **ACCEPT**；F0-A1 已 **OWNER ACCEPTED**。F0-A2 是 owner-acceptance/delivery 状态提交推送后的下一授权阶段。Standing authorization 允许后续阶段在各自技术、证据、质量、独立审查和交付门禁关闭后继续，但不免除任何门禁。
+**实施状态**：F0-A1 Rust Runtime Bootstrap 已实现，[独立 Critical 实现审查](specs/reviews/F0-A1-runtime-implementation-review-2026-08-21.md)为 **ACCEPT**，且[产品负责人验收](specs/reviews/F0-A1-owner-acceptance-2026-08-21.md)为 **ACCEPT**；F0-A1 已 **OWNER ACCEPTED**。Owner-acceptance/delivery 状态提交已推送；F0-A2 是当前已授权阶段并可立即启动。Standing authorization 允许后续阶段在各自技术、证据、质量、独立审查和交付门禁关闭后继续，但不免除任何门禁。
 
 交付：
 
@@ -45,7 +45,7 @@
 - [x] [M6 Electron Shell Architecture Critical Review](specs/reviews/M6-electron-shell-architecture-review-2026-08-21.md) **ACCEPT**：当前Shell/security/transport/ownership唯一Critical ACCEPT；仅接受文档架构，不证明代码/package/平台证据存在，也不授权F0/F1实现
 - [ ] 完成所选进程形态的三平台Spike，包括Electron app single-instance、per-data-root Runtime datastore lock、第二实例激活、Attempt/Coordination两阶段launch崩溃窗口、按launch/registration终止、safe-shutdown两阶段收敛和crash回收
 - [x] F0-A1 Rust Runtime Bootstrap：独立二进制、authenticated loopback、canonical data-root datastore lock 与 WSL/Linux 进程证据已实现；独立 Critical 实现审查与产品负责人验收均 ACCEPT，已 OWNER ACCEPTED
-- [ ] F0-A2 Electron Supervisor/Security Bridge：Security-owned BrowserWindow factory/external native confirmation、closed ActivationIntent、Workspace create commandId对账、opaque selection binding、exact byte-credit MessagePort与签名sidecar；已作为下一阶段获授权，在 owner-acceptance/delivery 状态提交推送后开始，且必须完成自身技术/审查门禁
+- [ ] F0-A2 Electron Supervisor/Security Bridge：Security-owned BrowserWindow factory/external native confirmation、closed ActivationIntent、Workspace create commandId对账、opaque selection binding、exact byte-credit MessagePort与签名sidecar；已授权且 owner-acceptance/delivery 状态提交已推送，可立即开始，且必须完成自身技术/审查门禁
 - [ ] F0-A3 Windows/macOS/Linux Electron+Runtime proof：pinned fuse flip/final-binary readback、签名安装/更新/卸载、activation/log、safe quit/crash recovery、installed forms/Terminal IME与a11y矩阵；仅在产品负责人验收F0-A2后开始
 
 关闭条件：
@@ -58,7 +58,7 @@
 
 ### F1 · Desktop Shell 与 Design System
 
-详细实施规格：[f1-shell-design-system.md](specs/f1-shell-design-system.md)。F1-A（F1-01 至 F1-15）负责Renderer基础，并针对opaque目录DTO、frozen bridge消费、root reconciliation和bootstrap泄露重新验收；F1-B（F1-16 至 F1-20）负责Electron与Runtime接线，必须等待F0-A3完成真实平台证明。F0-A1 已 OWNER ACCEPTED；当前下一阶段为已授权的 F0-A2。F0-A3 与 F1 只能在前序门禁关闭后按 standing authorization 继续，不得提前恢复或跳过门禁。
+详细实施规格：[f1-shell-design-system.md](specs/f1-shell-design-system.md)。F1-A（F1-01 至 F1-15）负责Renderer基础，并针对opaque目录DTO、frozen bridge消费、root reconciliation和bootstrap泄露重新验收；F1-B（F1-16 至 F1-20）负责Electron与Runtime接线，必须等待F0-A3完成真实平台证明。F0-A1 已 OWNER ACCEPTED；当前已授权阶段为 F0-A2，可立即启动。F0-A3 与 F1 只能在前序门禁关闭后按 standing authorization 继续，不得提前恢复或跳过门禁。
 
 交付：
 
@@ -319,4 +319,4 @@ F0 文档/架构
 
 ## 6. 当前下一步
 
-[M6 Electron Shell Architecture Critical Review](specs/reviews/M6-electron-shell-architecture-review-2026-08-21.md)已**ACCEPT**当前Electron文档架构，是Shell/security/transport/ownership唯一当前Critical ACCEPT；它不证明Electron源码、manifest、fuse、installer或三平台证据存在。旧[M6 Interaction Contract Final Critical Review](specs/reviews/M6-interaction-contract-final-review-2026-08-21.md)只保留未变化Domain/save/interaction的历史局部证据。产品负责人已单独授权F0-A1；Rust Runtime Bootstrap及WSL/Linux证据现已实现，[独立Critical实现审查](specs/reviews/F0-A1-runtime-implementation-review-2026-08-21.md)与[产品负责人验收](specs/reviews/F0-A1-owner-acceptance-2026-08-21.md)均为 **ACCEPT**，F0-A1 已 OWNER ACCEPTED。当前下一步是在本 acceptance/delivery 状态提交推送后启动已授权的 F0-A2；F0-A3、F1和后续产品阶段仍须逐项关闭自身技术、证据、质量、独立审查和交付门禁。
+[M6 Electron Shell Architecture Critical Review](specs/reviews/M6-electron-shell-architecture-review-2026-08-21.md)已**ACCEPT**当前Electron文档架构，是Shell/security/transport/ownership唯一当前Critical ACCEPT；它不证明Electron源码、manifest、fuse、installer或三平台证据存在。旧[M6 Interaction Contract Final Critical Review](specs/reviews/M6-interaction-contract-final-review-2026-08-21.md)只保留未变化Domain/save/interaction的历史局部证据。产品负责人已单独授权F0-A1；Rust Runtime Bootstrap及WSL/Linux证据现已实现，[独立Critical实现审查](specs/reviews/F0-A1-runtime-implementation-review-2026-08-21.md)与[产品负责人验收](specs/reviews/F0-A1-owner-acceptance-2026-08-21.md)均为 **ACCEPT**，F0-A1 已 OWNER ACCEPTED。Owner-acceptance/delivery 状态提交已推送，当前下一步是立即启动已授权的 F0-A2；F0-A3、F1和后续产品阶段仍须逐项关闭自身技术、证据、质量、独立审查和交付门禁。

@@ -1,7 +1,7 @@
 # M6 Interaction Implementation Slices
 
 **状态**：CURRENT · 2026-08-21 Critical-reviewed documentation / implementation-spec baseline · PRODUCT IMPLEMENTATION PAUSED（本文不表示 I1-I6 产品代码已实现或已获实现授权）
-**当前授权**：产品负责人已单独授权且仅授权 F0-A1 Rust Runtime Bootstrap；该切片独立 Critical 实现审查与产品负责人验收均 ACCEPT，F0-A1 已 OWNER ACCEPTED。F0-A2 是 acceptance/delivery 状态提交推送后的下一授权阶段；F0-A3、F1 与 I1-I6 仍须按前序技术/审查/质量/交付门禁推进。
+**当前授权**：产品负责人已单独授权且仅授权 F0-A1 Rust Runtime Bootstrap；该切片独立 Critical 实现审查与产品负责人验收均 ACCEPT，F0-A1 已 OWNER ACCEPTED。Owner-acceptance/delivery 状态已推送；F0-A2 是当前已授权阶段并可立即启动；F0-A3、F1 与 I1-I6 仍须按前序技术/审查/质量/交付门禁推进。
 **范围**：I1 Shell/Navigation、I2 Organization/Workflow Canvas、I3 Run/Attention、I4 Active Seats/Session/Terminal、I5 Files/Diff/Artifact/Review、I6 Queue/Schedule/Restore
 
 ## 1. 文档职责
@@ -787,7 +787,7 @@ I1 Shell owner gate
 - F3-A 关闭 shared Domain/protocol、持久化、gateway 与 Runner 资格后，F3-B 才能并行实施 Agent workspace 和 I5-B。
 - F3-B 的多 Agent/Result Review 闭环通过后，F3-C 才能并行实施 I3 干预与 I5-C 行内 Review/Rework。
 - F3-C 的干预、历史和恢复语义通过后，F3-D 才能实施 I6。任何 I6 页面原型都不能被计作已打开 F3-D 实施。
-- 产品负责人已单独授权且仅授权 F0-A1；该切片独立 Critical 实现审查与产品负责人验收均 ACCEPT，F0-A1 已 OWNER ACCEPTED。F0-A2 在 acceptance/delivery 状态提交推送后启动；F0-A3、F1 与全部产品阶段仍须按本表顺序关闭前序技术/审查/质量/交付门禁，standing authorization 不构成跳过门禁的许可。
+- 产品负责人已单独授权且仅授权 F0-A1；该切片独立 Critical 实现审查与产品负责人验收均 ACCEPT，F0-A1 已 OWNER ACCEPTED。Owner-acceptance/delivery 状态已推送，F0-A2 可立即启动；F0-A3、F1 与全部产品阶段仍须按本表顺序关闭前序技术/审查/质量/交付门禁，standing authorization 不构成跳过门禁的许可。
 
 ### 9.2 文件、包与命名空间所有权
 

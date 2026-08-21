@@ -8,8 +8,8 @@
 **Branch:** `main`
 **Implementation review:** [F0-A1 Runtime Implementation Critical Review](F0-A1-runtime-implementation-review-2026-08-21.md) · **ACCEPT**
 **Implementation review SHA-256:** `2bd8f1f183e6385f6ca3948ad25cb9f0425186d7f718c7848978a53ab5e2745f`
-**Push state:** **PENDING** until the controller pushes the implementation and owner-acceptance delivery state
-**Acceptance-status commit:** not yet created; the controller/workbench records its SHA and push result after delivery
+**Acceptance-delivery checkpoint:** implementation and owner-acceptance status were **PUSHED** through `c27e4bcc902854e29b08c42d0c659999dbf8767a`; local, tracking, and remote `main` were synchronized at that checkpoint before the later ledger-only commit
+**Owner-acceptance status commit:** `c27e4bcc902854e29b08c42d0c659999dbf8767a` · **PUSHED**
 
 ## 1. Explicit Owner Decision
 
@@ -76,7 +76,7 @@ These items remain subject to their F0-A2/F0-A3 and later platform/product gates
 
 ## 5. Subsequent Authorization
 
-F0-A2 is authorized as the next implementation phase after the controller creates and pushes the owner-acceptance/delivery status commit containing this record. Until that push is complete, F0-A2 start remains blocked on delivery state, not on owner intent.
+The owner-acceptance/delivery status commit `c27e4bcc902854e29b08c42d0c659999dbf8767a` has been pushed, so the delivery condition is fulfilled. F0-A2 is the active authorized next phase and may start now, subject to all of its technical, security, evidence, quality, independent-review, and delivery gates.
 
 After F0-A2, standing authorization permits the controller to continue into subsequent phases only when each preceding phase's technical and independent-review gates have closed. No phase may skip its architecture, security, runtime, platform, quality, evidence, review, or delivery requirements. Later phases are authorized conditionally; they are not currently implemented or automatically accepted.
 
@@ -87,9 +87,9 @@ After F0-A2, standing authorization permits the controller to continue into subs
 - Branch: `main`
 - Independent implementation verdict: **ACCEPT**
 - Owner verdict: **ACCEPT**
-- Implementation commit push: **PENDING**
-- Owner-acceptance status commit: **PENDING CREATION**
-- Owner-acceptance status push: **PENDING**
-- F0-A2 start: **AUTHORIZED AFTER ACCEPTANCE/DELIVERY COMMIT PUSH**
+- Implementation commit: `aacc6d0dc68f3805b31aa69316561b8cdacad2a0` · **PUSHED**
+- Owner-acceptance status commit: `c27e4bcc902854e29b08c42d0c659999dbf8767a` · **PUSHED**
+- Acceptance-delivery checkpoint: local/tracking/remote `main` were synchronized through `c27e4bcc902854e29b08c42d0c659999dbf8767a` before this later ledger-only synchronization commit
+- F0-A2 start: **AUTHORIZED / MAY START NOW**
 
-The controller and dev-workbench must append the acceptance-status commit SHA and final push state after delivery. This record does not itself commit or push changes.
+The acceptance implementation/status SHAs and push result above are final for this record. Any future documentation-only delivery-ledger synchronization commit SHA is recorded by the controller in dev-workbench rather than recursively added to this self-contained acceptance record.

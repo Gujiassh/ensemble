@@ -1,12 +1,12 @@
 # Platform Adaptation SSoT
 
-**状态**：Electron Shell文档架构Critical ACCEPT；F0-A1 OWNER ACCEPTED；F0-A2为下一授权阶段；F0-A3、F1受前序门禁约束，三平台package/lifecycle证据待补（2026-08-21）
+**状态**：Electron Shell文档架构Critical ACCEPT；F0-A1 OWNER ACCEPTED；F0-A2为当前已授权阶段；F0-A3、F1受前序门禁约束，三平台package/lifecycle证据待补（2026-08-21）
 **首发平台**：Windows、macOS、Linux
 **Web**：仅开发和自动化验证，不作为首发产品
 **Electron 边界**：[m6-electron-shell.md](../specs/m6-electron-shell.md)
 **架构审查**：[M6 Electron Shell Architecture Critical Review](../specs/reviews/M6-electron-shell-architecture-review-2026-08-21.md) · **ACCEPT** · docs only · Electron implementation paused
 **Runtime审查**：[F0-A1 Runtime Implementation Critical Review](../specs/reviews/F0-A1-runtime-implementation-review-2026-08-21.md) · **ACCEPT**
-**Owner验收**：[F0-A1 Owner Acceptance](../specs/reviews/F0-A1-owner-acceptance-2026-08-21.md) · **ACCEPT** · F0-A1 OWNER ACCEPTED · F0-A2 next after delivery push
+**Owner验收**：[F0-A1 Owner Acceptance](../specs/reviews/F0-A1-owner-acceptance-2026-08-21.md) · **ACCEPT** · F0-A1 OWNER ACCEPTED · delivery pushed · F0-A2 authorized / may start now
 **实施 Spike**：[m6-platform-packaging.md](../specs/m6-platform-packaging.md)
 **执行与权限**：[m6-execution-workspace-security.md](../specs/m6-execution-workspace-security.md)
 

@@ -318,3 +318,4 @@
 - **后续禁止**：F0-A2、F0-A3、F1 和全部产品实现继续暂停。F0-A1 已通过独立审查，但仍须由产品负责人明确验收；验收后仍需再次明确授权才能启动 F0-A2；不得由本条、既有 Electron review 或 Linux 证据推导授权。
 - **证据真源**：[Rust Runtime Bootstrap SSoT](ssot/runtime-bootstrap.md) 与 [F0-A1 WSL/Linux evidence](specs/evidence/f0-a1/wsl-linux-2026-08-21.md)。
 - **Owner result（2026-08-21）**：[F0-A1 Owner Acceptance](specs/reviews/F0-A1-owner-acceptance-2026-08-21.md) 记录产品负责人明确 **ACCEPT**；F0-A1 现为 **OWNER ACCEPTED / ACCEPTED**。本条追加结果覆盖上方当时的 owner-pending 状态但不改写历史。F0-A2 在 acceptance/delivery 状态提交推送后获准启动；后续 standing authorization 仍要求每阶段完整关闭技术、证据、质量、独立审查和交付门禁，不得跳过。
+- **Delivery result（2026-08-21）**：实现提交 `aacc6d0dc68f3805b31aa69316561b8cdacad2a0` 与 owner-acceptance 状态提交 `c27e4bcc902854e29b08c42d0c659999dbf8767a` 均已推送，local/tracking/remote `main` 一致。F0-A2 的 delivery 前置条件已满足，现为可立即启动的已授权阶段；后续门禁要求不变。
