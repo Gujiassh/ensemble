@@ -2,8 +2,8 @@
 
 **Date**: 2026-08-20
 **Risk class**: Critical
-**Overall status**: IMPLEMENTATION PAUSED BY OWNER
-**Current slice**: F0-A1 Rust Runtime Bootstrap specification unchanged; Electron documentation does not authorize implementation
+**Overall status**: F0-A1 IMPLEMENTATION CRITICAL REVIEW ACCEPT · AWAITING OWNER ACCEPTANCE
+**Current slice**: F0-A1 Rust Runtime Bootstrap implemented on WSL/Linux; independent Critical implementation verdict ACCEPT; owner acceptance PENDING; F0-A1 is not owner-accepted and F0-A2 is not authorized
 
 ## 1. Purpose
 
@@ -21,7 +21,7 @@ Engineering completion is not owner acceptance. A later slice must not silently 
 
 | Slice | Deliverable | Status | Start condition |
 |---|---|---|---|
-| F0-A1 | Independent Rust Runtime bootstrap, authenticated loopback health, canonical data-root ownership, and datastore lock | SPEC READY · IMPLEMENTATION PAUSED | Owner authorizes implementation to resume |
+| F0-A1 | Independent Rust Runtime bootstrap, authenticated loopback health, canonical data-root ownership, and datastore lock | IMPLEMENTATION CRITICAL REVIEW ACCEPT · AWAITING OWNER ACCEPTANCE | Product owner acceptance; later slices still require separate authorization |
 | F0-A2 | Electron Supervisor/Security Bridge: Security-owned BrowserWindow/external confirm, closed activation, Workspace-create commandId/selection binding, exact byte-credit streams, and signed sidecar | PENDING | Owner accepts F0-A1 and explicitly authorizes F0-A2 |
 | F0-A3 | Windows/macOS/Linux Electron+Runtime lifecycle, final-binary fuse readback, signing/update/uninstall, closed activation/log proof, and installed-app IME/a11y matrix | PENDING | Owner accepts F0-A2 |
 
@@ -38,10 +38,10 @@ Required behavior:
 - acquire an exclusive datastore lock for that canonical data root before serving requests
 - allow different data roots to run concurrently while rejecting a second Runtime for the same data root
 - bind only to `127.0.0.1` on an operating-system-assigned port
-- require a high-entropy session token for every HTTP request, including health checks
-- publish an atomic ready descriptor only after the lock and authenticated listener are ready
+- require a producer-generated high-entropy session token for every HTTP request, including health checks; Runtime validates token68 syntax/minimum encoded material but cannot validate unpredictability
+- require the canonical ready target to be outside the canonical data root, hold a persistent sibling cross-process ready-path lease, and publish an atomic descriptor only after both locks and the authenticated listener are ready
 - expose a versioned authenticated health response with Runtime PID, protocol version, and a non-secret data-root digest
-- remove the ready descriptor on graceful shutdown when the current process still owns it
+- own every accepted health-only HTTP/1.1 connection task, deterministically prioritize shutdown over accept pressure, bound graceful drain to 1 second, abort/join all remainder, then remove the ready descriptor when the current process still owns it and release both leases; protocol upgrades/WebSockets remain disabled
 - emit flat, grep-friendly lifecycle logs without the session token, absolute secret-file contents, or request bodies
 
 The implementation may use a dedicated crate under `crates/`. It must not modify the existing frontend Mock files.
@@ -57,9 +57,9 @@ ensemble-runtime \
   --ready-file <path>
 ```
 
-The token file contains at least 256 bits of unpredictable token material. The Runtime reads it during bootstrap and never writes the token to the ready descriptor or logs.
+The token producer must generate at least 32 unpredictable bytes with a cryptographically secure random generator. The Runtime reads the encoded token during bootstrap and never writes it to the ready descriptor or logs; its token68/minimum encoded-material checks do not and cannot prove entropy. The owner smoke proves its own 32-byte CSPRNG generation. F0-A2 must later prove production Shell generation and token-file protection without changing the accepted token encoding contract.
 
-The ready descriptor is written through a temporary file plus atomic replacement and contains:
+The ready target's existing parent is canonicalized. The target must be outside the canonical data root and must not use the reserved `.ensemble-runtime-ready.lock` suffix. The Runtime holds a persistent sibling lease file for the target's lifetime; the lease file is not unlinked on drop. The ready descriptor is written through a same-directory temporary file plus atomic replacement and contains:
 
 ```text
 protocolVersion
@@ -94,9 +94,10 @@ Expected results:
 | Isolation | Two distinct data roots can run concurrently on distinct assigned ports. | Integration test |
 | Authentication | Missing and incorrect bearer tokens return `401`; the correct token returns `200`. | HTTP integration test |
 | Secret handling | Token material is absent from ready data and captured logs. | Assertion over evidence files |
-| Ready ordering | The ready descriptor never appears before lock and listener readiness. | Crash-window test |
-| Shutdown | Graceful termination removes only the current owner's ready descriptor and releases the lock. | Restart smoke test |
-| Failure honesty | Lock conflict, invalid token file, invalid data root, or listener failure exits non-zero and never leaves a valid ready descriptor. | Negative tests |
+| Ready ordering | The ready descriptor never appears before data-root lock, ready-path lease, listener, and shutdown registration readiness. | Poll-order and repeated post-ready signal tests |
+| Ready coordination | Ready equal to/inside the canonical data root is rejected; an active ready path cannot be shared across roots; a stale descriptor is replaceable only after the prior lease releases. | Exact/alias and shared-path process tests |
+| Shutdown | Graceful termination stops accept, gives owned HTTP tasks at most 1 second to drain, aborts/joins every remainder before return, removes only the current owner's ready descriptor, and releases both leases even with an incomplete request. | In-process ownership, socket-close, slow-request, and restart tests |
+| Failure honesty | Lock/token/data-root/listener/ready failures return stable failure and do not publish or mutate a descriptor the failed process would own. An active descriptor remains unchanged; stale replacement occurs only after acquiring the released lease and successfully publishing. | Negative tests |
 
 ## 6. Owner acceptance for F0-A1
 
@@ -117,6 +118,7 @@ The acceptance record must include the commit SHA, operating system, commands, o
 F0-A1 does not implement:
 
 - Electron tray behavior, BrowserWindow security, Preload/IPC, window activation, or updater
+- WebSocket/HTTP upgrade, Event stream, or session transport; a future authorized slice must put every upgrade/session task in an explicit owned registry
 - Shell-side supervisor ownership
 - SQLite Event ledger schema or business Domain commands
 - Runner discovery, AttemptLaunch, PTY/ConPTY, or permission enforcement
@@ -135,3 +137,14 @@ These concerns remain in later owner-accepted slices and must not be added specu
 - graceful stop, lock release, and restart evidence
 - independent Critical review with each semantic oracle marked `pass`, `blocked`, or `not applicable`
 - owner acceptance result
+
+Current implementation evidence:
+
+- `pnpm verify:f0-a1`: pass; format, production/all-target Clippy, 10 unit tests, 16 black-box process integration tests, and 2 in-process owned-server integration tests
+- `pnpm smoke:f0-a1`: pass on WSL/Linux with empty Runtime environment, `401`/`200`, same-root rejection, different-root concurrency, no child process, SIGTERM removal, and restart
+- sanitized record: [F0-A1 WSL/Linux implementation evidence](evidence/f0-a1/wsl-linux-2026-08-21.md)
+- enforceable bootstrap contract and owner runbook: [Rust Runtime Bootstrap SSoT](../ssot/runtime-bootstrap.md)
+- independent Critical review: [**ACCEPT**](reviews/F0-A1-runtime-implementation-review-2026-08-21.md)
+- owner acceptance: **PENDING**; F0-A1 is not owner-accepted
+
+Independent implementation ACCEPT does not start F0-A2 or close Windows/macOS platform proof. F0-A2 remains forbidden until owner acceptance and a separate explicit authorization.

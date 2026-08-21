@@ -6,7 +6,7 @@ use subtle::ConstantTimeEq;
 
 use crate::RuntimeError;
 
-const MIN_TOKEN_CHARACTERS: usize = 43;
+const MIN_TOKEN68_MATERIAL_CHARACTERS: usize = 43;
 const MAX_TOKEN_FILE_BYTES: u64 = 16 * 1024;
 
 #[derive(Clone)]
@@ -26,14 +26,12 @@ impl SessionToken {
 
         let contents = fs::read(path).map_err(RuntimeError::TokenRead)?;
         let token = trim_ascii_whitespace(&contents);
-        if token.len() < MIN_TOKEN_CHARACTERS {
-            return Err(RuntimeError::TokenTooShort);
-        }
         if token.len() as u64 > MAX_TOKEN_FILE_BYTES {
             return Err(RuntimeError::TokenTooLarge);
         }
-        if !is_token68(token) {
-            return Err(RuntimeError::TokenInvalid);
+        let material_len = token68_material_len(token).ok_or(RuntimeError::TokenInvalid)?;
+        if material_len < MIN_TOKEN68_MATERIAL_CHARACTERS {
+            return Err(RuntimeError::TokenTooShort);
         }
 
         Ok(Self {
@@ -67,17 +65,21 @@ fn trim_ascii_whitespace(mut value: &[u8]) -> &[u8] {
     value
 }
 
-fn is_token68(value: &[u8]) -> bool {
-    let mut saw_padding = false;
-    value.iter().all(|byte| {
-        if *byte == b'=' {
-            saw_padding = true;
-            return true;
-        }
-        !saw_padding
-            && (byte.is_ascii_alphanumeric()
-                || matches!(*byte, b'-' | b'.' | b'_' | b'~' | b'+' | b'/'))
-    })
+fn token68_material_len(value: &[u8]) -> Option<usize> {
+    let material_len = value
+        .iter()
+        .position(|byte| *byte == b'=')
+        .unwrap_or(value.len());
+    let (material, padding) = value.split_at(material_len);
+    if material.is_empty()
+        || !material.iter().all(|byte| {
+            byte.is_ascii_alphanumeric() || matches!(*byte, b'-' | b'.' | b'_' | b'~' | b'+' | b'/')
+        })
+        || !padding.iter().all(|byte| *byte == b'=')
+    {
+        return None;
+    }
+    Some(material_len)
 }
 
 #[cfg(test)]
@@ -98,7 +100,7 @@ mod tests {
     }
 
     #[test]
-    fn accepts_a_256_bit_encoded_token_and_uses_constant_time_digest_comparison() {
+    fn accepts_a_producer_encoded_32_byte_token_and_uses_constant_time_digest_comparison() {
         let file = token_file(format!("{TOKEN}\n").as_bytes());
         let token = SessionToken::load(file.path()).expect("valid token");
 
@@ -127,5 +129,12 @@ mod tests {
             Err(error) => error,
         };
         assert_eq!(malformed_error.code(), "token_invalid");
+
+        let padding_only = token_file(b"===========================================");
+        let padding_error = match SessionToken::load(padding_only.path()) {
+            Ok(_) => panic!("padding-only token was accepted"),
+            Err(error) => error,
+        };
+        assert_eq!(padding_error.code(), "token_invalid");
     }
 }

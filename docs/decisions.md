@@ -309,3 +309,11 @@
 - **目标目录**：`apps/canvas`继续是Renderer；`apps/desktop`拥有Electron Main/Preload/test/electron-builder配置；`packages/protocol/src/shell/**`是唯一Shell bridge contract/validation子模块；`apps/canvas/src/runtime-gateway/electron-gateway.ts`消费frozen bridge。不得创建第二Shell-contract包或双production wrapper。
 - **审查与暂停**：[M6 Electron Shell Architecture Critical Review](specs/reviews/M6-electron-shell-architecture-review-2026-08-21.md)已**ACCEPT**，是当前Shell/security/transport/ownership唯一Critical ACCEPT；只接受文档架构，不证明Electron代码、package或平台证据存在，也不授权实现。F0-A1合同不变，F0-A2/F0-A3/F1顺序不变；F0/F0-A1/F1和产品实现继续暂停，下一步等待产品负责人显式授权F0-A1。旧M6 interaction final review仅是未变化Domain/save/interaction的HISTORICAL/PARTIAL证据。
 - **真源**：`specs/m6-electron-shell.md`、`specs/m6-architecture.md`、`specs/m6-platform-packaging.md`、`specs/f0-a-runtime-lifecycle.md`、`specs/f1-shell-design-system.md`、`ssot/platform-adaptation.md`和`12-dev-plan.md`。
+
+## D036 · F0-A1 Rust Runtime Bootstrap 单独授权与当前门禁（2026-08-21）
+
+- **单独授权**：产品负责人在 Electron 文档架构 review 之后，通过当前主控单独授权且仅授权 F0-A1 Rust Runtime Bootstrap。旧 review 的文档 ACCEPT 本身仍不构成实现授权。
+- **当前状态**：F0-A1 已实现并有 WSL/Linux 黑盒证据；[独立 Critical 实现审查](specs/reviews/F0-A1-runtime-implementation-review-2026-08-21.md)为 **ACCEPT**，当前交付状态为 **AWAITING OWNER ACCEPTANCE**，owner acceptance 为 **PENDING**。这不是 owner ACCEPT，产品负责人明确验收前不得写成 owner-accepted/ACCEPTED。
+- **合同不变**：本切片只实现 [F0-A Runtime 生命周期合同](specs/f0-a-runtime-lifecycle.md) 的独立 Rust binary、authenticated loopback health、canonical data-root lock、data-root 外 leased atomic ready 与 1 秒 HTTP drain/graceful shutdown；Domain、Command/Event、Runtime API、持久化字段和 save meaning 均未改变。
+- **后续禁止**：F0-A2、F0-A3、F1 和全部产品实现继续暂停。F0-A1 已通过独立审查，但仍须由产品负责人明确验收；验收后仍需再次明确授权才能启动 F0-A2；不得由本条、既有 Electron review 或 Linux 证据推导授权。
+- **证据真源**：[Rust Runtime Bootstrap SSoT](ssot/runtime-bootstrap.md) 与 [F0-A1 WSL/Linux evidence](specs/evidence/f0-a1/wsl-linux-2026-08-21.md)。

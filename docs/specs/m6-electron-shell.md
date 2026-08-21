@@ -1,9 +1,9 @@
 # M6 Electron Shell and Rust Runtime Boundary
 
-**状态**：CURRENT · CRITICAL-REVIEWED ACCEPT DOCUMENTATION BASELINE · F0/F1 IMPLEMENTATION PAUSED（2026-08-21）
+**状态**：CURRENT · CRITICAL-REVIEWED ACCEPT DOCUMENTATION BASELINE · F0-A1 IMPLEMENTATION CRITICAL REVIEW ACCEPT/AWAITING OWNER ACCEPTANCE · F0-A2/F0-A3/F1 IMPLEMENTATION PAUSED（2026-08-21）
 **风险等级**：Critical
 **审查**：[M6 Electron Shell Architecture Critical Review](reviews/M6-electron-shell-architecture-review-2026-08-21.md) · **ACCEPT** · 当前Shell/security/transport/ownership唯一Critical ACCEPT · 仅限文档范围
-**阶段**：F0-A2 Electron Supervisor/Security Bridge，随后 F0-A3 三平台生命周期与打包证明；所有实现仍暂停
+**阶段**：F0-A1 已单独获授权并实现，独立 Critical 实现审查已 ACCEPT，当前等待产品负责人验收且尚未 owner-accepted；F0-A2 Electron Supervisor/Security Bridge 与后续 F0-A3 仍暂停且未获授权，owner 验收后仍需单独明确授权
 **依赖**：[m6-architecture.md](m6-architecture.md) · [f0-a-runtime-lifecycle.md](f0-a-runtime-lifecycle.md) · [m6-local-runtime-scheduling.md](m6-local-runtime-scheduling.md) · [m6-platform-packaging.md](m6-platform-packaging.md) · [m6-events-commands.md](m6-events-commands.md) · [m6-execution-workspace-security.md](m6-execution-workspace-security.md) · [../ssot/platform-adaptation.md](../ssot/platform-adaptation.md)
 
 ## 1. 背景、目标与不变范围
@@ -17,7 +17,7 @@ Ensemble 的生产桌面壳选择 Electron，以固定 Chromium 渲染行为、�
 - React Canvas Renderer 的产品布局、Domain 投影、交互语义和设计系统。
 - Rust Runtime 的 Domain、Command、Event、SQLite、队列、计划、权限、Runner Adapter、PTY/ConPTY、进程树和安全退出所有权。
 - [m6-domain-model.md](m6-domain-model.md)、[m6-run-operations.md](m6-run-operations.md) 和 [m6-runner-adapter.md](m6-runner-adapter.md) 定义的数据、保存和执行语义。
-- F0-A1 的 token file、ready descriptor、随机 loopback 端口、认证健康检查、不同 data root 并行、同 root datastore lock 和 graceful release 合同。
+- F0-A1 的 producer-generated 32-byte CSPRNG token、data-root 外 ready path/持久 sibling lease、ready descriptor、随机 loopback 端口、认证健康检查、不同 data root 并行、同 root datastore lock 和 1 秒 HTTP drain/graceful release 合同。
 - Workspace/FileRoot/PathGrant 在 Runtime 内部保存真实平台路径的现有含义。Electron 只改变 Renderer 到 Shell 的结构化目录选择边界，不改变 Runtime API 或持久化字段。
 
 ## 2. 生产进程与信任边界
@@ -346,14 +346,15 @@ Electron Main 只监督随当前安装包交付的 Rust Runtime sidecar：
 
 第二实例只允许`{ kind: "activate", target?: { kind: "workspace" | "run" | "attention", id } }`。完整intent UTF-8 JSON上限512 bytes；`id`必须匹配`^[A-Za-z0-9_-]{1,128}$`。source只能是同一Electron app identity/single-instance lock触发的`second-instance`event；IPC/Renderer不能伪造。Main丢弃OS传入的raw argv/cwd和除Electron framework启动所需外的flags，不解析path/URL/env。intent拒绝raw file path、URL、token、port、PID、ready path和未知key；raw second-instance输入不得写log。通过验证的opaque target必须等Runtime health与startup reconciliation完成后再导航；target不存在/无权时显示typed unavailable。
 
-F0-A1 bootstrap合同保持不变：Main 创建权限收紧的 token file 与 ready file path，执行签名 sidecar，并传入显式 data root、token file 和 ready file。Runtime 继续：
+F0-A1 bootstrap合同保持不变：Main 必须用 CSPRNG 生成至少 32 字节不可预测 token、创建权限收紧的 token file，并选择 canonical parent 位于 data root 外的 ready file path；F0-A2 必须证明生成和文件保护。Main 随后执行签名 sidecar，并传入显式 data root、token file 和 ready file。Runtime 继续：
 
 - 解析 canonical data root 并获取 datastore lock；
+- canonicalize ready parent，拒绝 data root 内/equal target，并持有 persistent sibling ready-path lease；
 - 随机绑定 `127.0.0.1:0`；
+- 只验证 token68 syntax/minimum encoded material，并对所有 HTTP 请求要求会话 token；
 - 原子发布 ready descriptor；
-- 对所有 HTTP 请求要求会话 token；
 - 以版本化 health 返回协议、PID 和非秘密 data-root digest；
-- graceful shutdown 时只删除自己拥有的 ready descriptor并释放 lock。
+- shutdown 后最多等待 HTTP drain 1 秒，只删除自己拥有的 ready descriptor并释放两类 lock。
 
 Main持有Runtime token、port、ready path和PID，只通过`runtime-client`发出typed代理请求。Renderer/Preload、Shell-exported DTO/error/diagnostic/telemetry、通知、URL和用户可导出的log不得包含这些bootstrap值或raw structured path/env。
 

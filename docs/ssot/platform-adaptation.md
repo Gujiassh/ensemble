@@ -1,10 +1,11 @@
 # Platform Adaptation SSoT
 
-**状态**：Electron Shell文档架构Critical ACCEPT；F0/F1实现暂停，三平台package/lifecycle证据待补（2026-08-21）
+**状态**：Electron Shell文档架构Critical ACCEPT；F0-A1实现Critical审查ACCEPT并等待产品负责人验收；F0-A2、F0-A3、F1实现暂停，三平台package/lifecycle证据待补（2026-08-21）
 **首发平台**：Windows、macOS、Linux
 **Web**：仅开发和自动化验证，不作为首发产品
 **Electron 边界**：[m6-electron-shell.md](../specs/m6-electron-shell.md)
-**架构审查**：[M6 Electron Shell Architecture Critical Review](../specs/reviews/M6-electron-shell-architecture-review-2026-08-21.md) · **ACCEPT** · docs only · implementation paused
+**架构审查**：[M6 Electron Shell Architecture Critical Review](../specs/reviews/M6-electron-shell-architecture-review-2026-08-21.md) · **ACCEPT** · docs only · Electron implementation paused
+**Runtime审查**：[F0-A1 Runtime Implementation Critical Review](../specs/reviews/F0-A1-runtime-implementation-review-2026-08-21.md) · **ACCEPT** · awaiting owner acceptance · owner pending · F0-A2 forbidden
 **实施 Spike**：[m6-platform-packaging.md](../specs/m6-platform-packaging.md)
 **执行与权限**：[m6-execution-workspace-security.md](../specs/m6-execution-workspace-security.md)
 
@@ -56,8 +57,8 @@ Electron Main 负责：
 1. 在任何Runtime spawn前调用`app.requestSingleInstanceLock(activationIntent)`；第二实例只提交closed intent `{kind, target?{kind,id}}`，丢弃且不记录raw argv/cwd/path/URL/env/bootstrap值
 2. 解析平台 app-config、app-data、app-log 和只读 resource path
 3. 从签名 manifest 定位并校验唯一 Rust sidecar
-4. 创建权限收紧的 token file 与 ready file path，传入 F0-A1 既有 bootstrap 参数
-5. 等待 Runtime datastore lock、随机 loopback listener、原子 ready descriptor、认证 health 和协议兼容检查
+4. 用 CSPRNG 生成至少 32 字节 token并创建权限收紧的 token file；在 data root 外选择 ready path，传入 F0-A1 bootstrap 参数；F0-A2 必须证明生成与文件保护
+5. 等待 Runtime datastore lock、persistent sibling ready-path lease、随机 loopback listener、原子 ready descriptor、认证 health 和协议兼容检查
 6. 持有Runtime token、port、ready path和PID，只向Renderer提供脱敏typed gateway；Runtime reconciliation完成后才解析opaque activation target
 7. 关闭窗口时隐藏到托盘并保留 Runtime、Runner、queue 和 schedule
 8. 显式退出时请求既有 Runtime safe-quit barrier并等待 acknowledgement
@@ -66,7 +67,7 @@ Electron Main 负责：
 
 Rust Runtime 继续负责 canonical data root、datastore lock、SQLite、Domain、queue/schedule、Runner、PTY/ConPTY、进程树、shutdown fence、Draft drain、completion Event 和 recovery classification。Main 不写 Attempt、Run、Handle 或数据库状态。
 
-F0-A1 的 token file、ready descriptor、`127.0.0.1:0`、认证 health、same-root lock、distinct-root concurrency 和 graceful release 语义保持不变。
+F0-A1 的 producer-generated token、data-root 外 ready path/persistent sibling lease、ready descriptor、`127.0.0.1:0`、认证 health、same-root lock、distinct-root concurrency 和 1 秒 HTTP drain/graceful release 语义保持不变。Runtime 只验证 token syntax/minimum encoded material，不能证明 entropy。
 
 ## 5. Renderer、Shell 与 Runtime 数据边界
 

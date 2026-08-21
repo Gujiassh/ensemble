@@ -1,6 +1,6 @@
 # Ensemble Engineering Rules
 
-These rules govern implementation and review. They do not authorize F0, F0-A1, product behavior, persistence contracts, or platform migration work. F0 remains paused. The Electron direction is documentation-only until its owning phase explicitly authorizes code changes.
+These rules govern implementation and review; they do not themselves authorize a phase, product behavior, persistence contract, or platform migration. The owner separately authorized only F0-A1 Rust Runtime Bootstrap. F0-A1 implementation has independent Critical review ACCEPT and now awaits explicit owner acceptance; it is not owner-accepted. F0-A2, F0-A3, F1, and product implementation remain paused and require separate explicit authorization after owner acceptance. The Electron direction remains documentation-only until its owning phase is explicitly authorized.
 
 ## Sources Of Truth
 

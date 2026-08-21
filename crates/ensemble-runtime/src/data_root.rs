@@ -19,7 +19,16 @@ pub struct LockedDataRoot {
 
 impl LockedDataRoot {
     pub fn acquire(path: &Path) -> Result<Self, RuntimeError> {
-        fs::create_dir_all(path).map_err(RuntimeError::DataRootCreate)?;
+        match fs::metadata(path) {
+            Ok(metadata) if !metadata.is_dir() => {
+                return Err(RuntimeError::DataRootNotDirectory);
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                fs::create_dir_all(path).map_err(RuntimeError::DataRootCreate)?;
+            }
+            Err(error) => return Err(RuntimeError::DataRootCreate(error)),
+        }
         let canonical_path =
             dunce::canonicalize(path).map_err(RuntimeError::DataRootCanonicalize)?;
         if !canonical_path.is_dir() {

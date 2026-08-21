@@ -9,7 +9,7 @@ pub struct Cli {
     #[arg(long, value_name = "PATH")]
     pub data_root: PathBuf,
 
-    /// File containing the high-entropy bearer token.
+    /// File containing the producer-generated bearer token.
     #[arg(long, value_name = "PATH")]
     pub session_token_file: PathBuf,
 

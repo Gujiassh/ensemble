@@ -1,13 +1,17 @@
 use std::{
-    fs::{self, File},
+    ffi::OsString,
+    fs::{self, File, OpenOptions},
     io::{self, Write},
     path::{Path, PathBuf},
 };
 
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 
 use crate::RuntimeError;
+
+const READY_LEASE_SUFFIX: &str = ".ensemble-runtime-ready.lock";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,15 +24,73 @@ pub struct ReadyDescriptor {
     pub started_at: String,
 }
 
-pub struct ReadyFileGuard {
-    path: PathBuf,
+pub(crate) struct ReadyPathLease {
+    ready_path: PathBuf,
+    lock_file: File,
+}
+
+impl ReadyPathLease {
+    pub(crate) fn acquire(path: &Path, canonical_data_root: &Path) -> Result<Self, RuntimeError> {
+        let parent = usable_parent(path)?;
+        let canonical_parent =
+            dunce::canonicalize(parent).map_err(RuntimeError::ReadyParentCanonicalize)?;
+        let file_name = path.file_name().ok_or(RuntimeError::ReadyPathInvalid)?;
+        if file_name
+            .to_string_lossy()
+            .to_ascii_lowercase()
+            .ends_with(READY_LEASE_SUFFIX)
+        {
+            return Err(RuntimeError::ReadyPathInvalid);
+        }
+
+        let ready_path = canonical_parent.join(file_name);
+        if ready_path == canonical_data_root || ready_path.starts_with(canonical_data_root) {
+            return Err(RuntimeError::ReadyInsideDataRoot);
+        }
+
+        let mut lease_file_name = OsString::from(file_name);
+        lease_file_name.push(READY_LEASE_SUFFIX);
+        let lease_path = canonical_parent.join(lease_file_name);
+        let lock_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&lease_path)
+            .map_err(RuntimeError::ReadyLeaseOpen)?;
+        match FileExt::try_lock_exclusive(&lock_file) {
+            Ok(()) => {}
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                return Err(RuntimeError::ReadyPathLocked);
+            }
+            Err(error) => return Err(RuntimeError::ReadyLease(error)),
+        }
+
+        Ok(Self {
+            ready_path,
+            lock_file,
+        })
+    }
+}
+
+impl Drop for ReadyPathLease {
+    fn drop(&mut self) {
+        let _ = FileExt::unlock(&self.lock_file);
+    }
+}
+
+pub(crate) struct ReadyFileGuard {
+    lease: ReadyPathLease,
     descriptor: ReadyDescriptor,
     armed: bool,
 }
 
 impl ReadyFileGuard {
-    pub fn publish(path: PathBuf, descriptor: ReadyDescriptor) -> Result<Self, RuntimeError> {
-        let parent = usable_parent(&path)?;
+    pub(crate) fn publish(
+        lease: ReadyPathLease,
+        descriptor: ReadyDescriptor,
+    ) -> Result<Self, RuntimeError> {
+        let parent = usable_parent(&lease.ready_path)?;
         let mut temporary =
             NamedTempFile::new_in(parent).map_err(RuntimeError::ReadyTemporaryCreate)?;
         serde_json::to_writer(temporary.as_file_mut(), &descriptor)
@@ -42,23 +104,23 @@ impl ReadyFileGuard {
             .sync_all()
             .map_err(RuntimeError::ReadyFlush)?;
         temporary
-            .persist(&path)
+            .persist(&lease.ready_path)
             .map_err(|error| RuntimeError::ReadyPublish(error.error))?;
         sync_parent(parent);
 
         Ok(Self {
-            path,
+            lease,
             descriptor,
             armed: true,
         })
     }
 
-    pub fn remove_if_owned(&mut self) -> Result<bool, RuntimeError> {
+    pub(crate) fn remove_if_owned(&mut self) -> Result<bool, RuntimeError> {
         if !self.armed {
             return Ok(false);
         }
 
-        let contents = match fs::read(&self.path) {
+        let contents = match fs::read(&self.lease.ready_path) {
             Ok(contents) => contents,
             Err(error) if error.kind() == io::ErrorKind::NotFound => {
                 self.armed = false;
@@ -73,8 +135,8 @@ impl ReadyFileGuard {
             return Ok(false);
         }
 
-        fs::remove_file(&self.path).map_err(RuntimeError::ReadyRemove)?;
-        if let Ok(parent) = usable_parent(&self.path) {
+        fs::remove_file(&self.lease.ready_path).map_err(RuntimeError::ReadyRemove)?;
+        if let Ok(parent) = usable_parent(&self.lease.ready_path) {
             sync_parent(parent);
         }
         self.armed = false;
@@ -110,52 +172,4 @@ fn sync_parent(parent: &Path) {
 fn sync_parent(_parent: &Path) {}
 
 #[cfg(test)]
-mod tests {
-    use std::fs;
-
-    use tempfile::tempdir;
-
-    use super::{ReadyDescriptor, ReadyFileGuard};
-
-    fn descriptor(pid: u32) -> ReadyDescriptor {
-        ReadyDescriptor {
-            protocol_version: "1".to_owned(),
-            pid,
-            host: "127.0.0.1".to_owned(),
-            port: 32100,
-            data_root_digest: "a".repeat(64),
-            started_at: "2026-08-20T00:00:00Z".to_owned(),
-        }
-    }
-
-    #[test]
-    fn publishes_complete_json_and_removes_only_its_own_descriptor() {
-        let temporary = tempdir().expect("temporary directory");
-        let path = temporary.path().join("runtime.ready.json");
-        let expected = descriptor(std::process::id());
-        let mut guard =
-            ReadyFileGuard::publish(path.clone(), expected.clone()).expect("publish descriptor");
-
-        let actual: ReadyDescriptor =
-            serde_json::from_slice(&fs::read(&path).expect("read descriptor"))
-                .expect("parse descriptor");
-        assert_eq!(actual, expected);
-        assert!(guard.remove_if_owned().expect("remove owned descriptor"));
-        assert!(!path.exists());
-    }
-
-    #[test]
-    fn preserves_a_replacement_descriptor() {
-        let temporary = tempdir().expect("temporary directory");
-        let path = temporary.path().join("runtime.ready.json");
-        let mut guard = ReadyFileGuard::publish(path.clone(), descriptor(10)).expect("publish");
-        fs::write(
-            &path,
-            serde_json::to_vec(&descriptor(11)).expect("serialize replacement"),
-        )
-        .expect("replace descriptor");
-
-        assert!(!guard.remove_if_owned().expect("ownership check"));
-        assert!(path.exists());
-    }
-}
+mod tests;

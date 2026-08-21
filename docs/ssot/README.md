@@ -12,10 +12,12 @@ This directory is the aggregation root for Ensemble's current, enforceable invar
 ## Independent Acceptance Evidence
 
 - [Code Quality Gates Critical/Standard Review (2026-08-21)](../specs/reviews/Code-quality-gates-review-2026-08-21.md): **ACCEPT** for the current quality tooling, governance, bounded review/debt ledgers, and CI contract only. It does not authorize F0, F0-A1, Electron implementation, product behavior, persistence changes, commit, push, merge, deployment, or release.
+- [F0-A1 Runtime Implementation Critical Review (2026-08-21)](../specs/reviews/F0-A1-runtime-implementation-review-2026-08-21.md): **ACCEPT** for the F0-A1 Linux/WSL implementation only; delivery is **AWAITING OWNER ACCEPTANCE**, owner acceptance is **PENDING**, and F0-A2 remains forbidden without later explicit authorization.
 
 ## Current Domains
 
 - [Code quality and maintainability](code-quality.md)
+- [Rust Runtime bootstrap](runtime-bootstrap.md)
 - [Design system](design-system.md)
 - [Internationalization](i18n.md)
 - [Platform adaptation](platform-adaptation.md)
