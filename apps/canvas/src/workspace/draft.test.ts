@@ -17,15 +17,9 @@ describe("workspace draft", () => {
 
   it("validates names against platform filename restrictions", () => {
     expect(validateWorkspaceName("  ")).toBe("workspace.validation.nameRequired");
-    expect(validateWorkspaceName("bad/name")).toBe(
-      "workspace.validation.nameInvalidChars",
-    );
-    expect(validateWorkspaceName("CON")).toBe(
-      "workspace.validation.nameInvalidChars",
-    );
-    expect(validateWorkspaceName("Alpha.")).toBe(
-      "workspace.validation.nameInvalidChars",
-    );
+    expect(validateWorkspaceName("bad/name")).toBe("workspace.validation.nameInvalidChars");
+    expect(validateWorkspaceName("CON")).toBe("workspace.validation.nameInvalidChars");
+    expect(validateWorkspaceName("Alpha.")).toBe("workspace.validation.nameInvalidChars");
     expect(validateWorkspaceName("Alpha")).toBeNull();
   });
 

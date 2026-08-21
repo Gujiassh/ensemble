@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "reviews": [
+    {
+      "path": "apps/canvas/src/app-shell/useRootLifecycle.ts",
+      "role": "react-hook",
+      "owner": "Canvas shell lifecycle owner",
+      "responsibility": "Coordinates the root shell bootstrap and workspace lifecycle state transitions.",
+      "decision": "accept-cohesive",
+      "rationale": "The hook remains one lifecycle orchestrator and its state/effects are covered by shell tests.",
+      "trigger": "Re-review before adding another lifecycle phase, effect family, or any code-line growth.",
+      "reviewedCodeLines": 190,
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "path": "apps/canvas/src/styles.css",
+      "role": "stylesheet",
+      "owner": "Canvas design system owner",
+      "responsibility": "Defines the current Canvas shell, workspace, and responsive authored stylesheet surface.",
+      "decision": "split-before-extension",
+      "rationale": "The file mixes multiple stable visual regions and should not absorb another feature area.",
+      "trigger": "Split by stable visual ownership before adding meaningful selectors or increasing code lines.",
+      "reviewedCodeLines": 650,
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "path": "apps/canvas/src/test-support/DiscordUiPreview.tsx",
+      "role": "test-preview",
+      "owner": "Canvas visual preview owner",
+      "responsibility": "Renders the temporary Discord-oriented visual review scenario and its local controls.",
+      "decision": "freeze-temporary",
+      "rationale": "This is review-only preview composition, not a production component architecture baseline.",
+      "trigger": "Do not extend; remove or replace it when visual review closes or code lines change.",
+      "reviewedCodeLines": 413,
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "path": "apps/canvas/src/test-support/discord-ui-preview.css",
+      "role": "test-preview",
+      "owner": "Canvas visual preview owner",
+      "responsibility": "Styles only the temporary Discord-oriented visual review scenario.",
+      "decision": "freeze-temporary",
+      "rationale": "The selectors are cohesive for a disposable preview and must not become production styling.",
+      "trigger": "Do not extend; delete with the preview or re-review any code-line change.",
+      "reviewedCodeLines": 430,
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "path": "apps/canvas/src/workspace/WorkspaceCreateFlow.tsx",
+      "role": "react-component",
+      "owner": "Canvas workspace flow owner",
+      "responsibility": "Orchestrates the existing multi-step workspace creation interaction and submission lifecycle.",
+      "decision": "split-before-extension",
+      "rationale": "State coordination and step orchestration are already at the component review boundary.",
+      "trigger": "Extract stable flow logic before adding a step, effect, validation branch, or code line.",
+      "reviewedCodeLines": 362,
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "path": "services/runtime/ensemble_runtime/run/registry.py",
+      "role": "python-module",
+      "owner": "Legacy Python runtime owner",
+      "responsibility": "Maintains the existing legacy Python run registry and playback coordination behavior.",
+      "decision": "freeze-no-growth",
+      "rationale": "The path remains active but is transition code while the Rust and Electron direction is resolved.",
+      "trigger": "Do not add responsibilities or code lines; split only for a required legacy defect repair.",
+      "reviewedCodeLines": 343,
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "path": "src-tauri/src/runtime.rs",
+      "role": "rust-module",
+      "owner": "Desktop runtime lifecycle owner",
+      "responsibility": "Implements the current Tauri-side runtime process supervision and lifecycle boundary.",
+      "decision": "freeze-no-growth",
+      "rationale": "The module is transition-owned while the documented Electron direction is evaluated separately.",
+      "trigger": "Do not add responsibilities or code lines; lifecycle fixes require owner review and tests.",
+      "reviewedCodeLines": 426,
+      "reviewBy": "2026-12-31"
+    }
+  ]
+}

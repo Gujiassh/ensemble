@@ -10,18 +10,14 @@ describe("AppShell root lifecycle", () => {
   it("boots into startup_error with the unavailable production gateway", async () => {
     renderWithProviders(<AppShell gateway={createUnavailableGateway()} />);
 
-    expect(
-      await screen.findByRole("button", { name: /Retry|重试/ }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Retry|重试/ })).toBeInTheDocument();
     expect(
       screen.getAllByText(/Workspace service unavailable|工作区服务不可用/).length,
     ).toBeGreaterThan(0);
     expect(screen.queryByText(/Fixture|LOD|Todo/i)).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /Open diagnostics|打开诊断/ }));
-    expect(
-      await screen.findByRole("dialog", { name: /Diagnostics|诊断/ }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: /Diagnostics|诊断/ })).toBeInTheDocument();
   });
 
   it("reaches no_workspace when the injected gateway is available and empty", async () => {
@@ -32,9 +28,7 @@ describe("AppShell root lifecycle", () => {
     expect(
       (await screen.findAllByRole("heading", { name: "No workspace" })).length,
     ).toBeGreaterThan(0);
-    expect(
-      screen.getAllByRole("button", { name: "Create workspace" }).length,
-    ).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "Create workspace" }).length).toBeGreaterThan(0);
   });
 
   it("creates a workspace only after a gateway success", async () => {

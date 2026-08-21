@@ -17,9 +17,7 @@ export function Button({
   type = "button",
   ...rest
 }: ButtonProps) {
-  const classes = ["ds-button", `ds-button--${variant}`, className]
-    .filter(Boolean)
-    .join(" ");
+  const classes = ["ds-button", `ds-button--${variant}`, className].filter(Boolean).join(" ");
 
   return (
     <button

@@ -1,0 +1,315 @@
+{
+  "version": 1,
+  "shape": {
+    "sourceRoots": [
+      "apps",
+      "packages",
+      "crates",
+      "src-tauri",
+      "scripts",
+      "services",
+      "runners"
+    ],
+    "excludedDirectories": [
+      ".git",
+      "node_modules",
+      "dist",
+      "dist-ssr",
+      "target",
+      "coverage",
+      ".turbo",
+      ".venv",
+      "__pycache__",
+      ".pytest_cache",
+      ".ruff_cache"
+    ],
+    "extensions": [
+      ".ts",
+      ".tsx",
+      ".js",
+      ".jsx",
+      ".css",
+      ".rs",
+      ".mjs",
+      ".cjs",
+      ".py"
+    ],
+    "generatedDirectoryNames": [
+      "generated",
+      "gen"
+    ],
+    "generatedFileNames": [],
+    "generatedNameFragments": [
+      ".generated."
+    ],
+    "declarativePaths": [
+      "apps/canvas/src/design-system/tokens/themes.ts"
+    ],
+    "localizationDirectoryNames": [
+      "locales",
+      "localization"
+    ],
+    "roles": {
+      "react-component": {
+        "soft": 250,
+        "review": 450
+      },
+      "react-hook": {
+        "soft": 160,
+        "review": 320
+      },
+      "typescript-logic": {
+        "soft": 300,
+        "review": 600
+      },
+      "rust-module": {
+        "soft": 220,
+        "review": 500
+      },
+      "stylesheet": {
+        "soft": 500,
+        "review": 1000
+      },
+      "test-preview": {
+        "soft": 350,
+        "review": 750
+      },
+      "localization": {
+        "soft": 600,
+        "review": 1200
+      },
+      "declarative-data": {
+        "soft": 600,
+        "review": 1200
+      },
+      "python-module": {
+        "soft": 300,
+        "review": 600
+      },
+      "python-test": {
+        "soft": 400,
+        "review": 800
+      }
+    },
+    "testDirectoryNames": [
+      "test-support",
+      "__tests__",
+      "fixtures",
+      "mocks",
+      "tests"
+    ],
+    "maxExceptionReviewDays": 180,
+    "trustedGeneratedPaths": [
+      "apps/canvas/src/vite-env.d.ts"
+    ],
+    "generatedHeaderLines": 8,
+    "maxExceptionGrowthRatio": 1.25,
+    "maxSoftReviewDays": 180,
+    "generatedDirectiveVersion": 1
+  },
+  "boundaries": {
+    "sourceRoots": [
+      "apps/canvas/src",
+      "packages/protocol/src"
+    ],
+    "extensions": [
+      ".ts",
+      ".tsx",
+      ".js",
+      ".jsx"
+    ],
+    "excludedDirectories": [
+      ".git",
+      "node_modules",
+      "dist",
+      "dist-ssr",
+      "target",
+      "coverage"
+    ],
+    "aliases": {
+      "@ensemble/protocol": "packages/protocol/src/index.ts"
+    },
+    "protocolRoot": "packages/protocol/src",
+    "applicationRoots": [
+      "apps"
+    ],
+    "testDirectoryNames": [
+      "test-support",
+      "__tests__",
+      "fixtures",
+      "mocks",
+      "tests"
+    ],
+    "testNameFragments": [
+      ".test.",
+      ".spec.",
+      ".stories.",
+      "Preview."
+    ],
+    "designSystemRoot": "apps/canvas/src/design-system",
+    "businessFeatureNames": [
+      "app-shell",
+      "canvas",
+      "inspector",
+      "preferences",
+      "settings",
+      "workspace"
+    ],
+    "featureRoot": "apps/canvas/src",
+    "featureDirectoryNames": [
+      "app-shell",
+      "canvas",
+      "inspector",
+      "preferences",
+      "settings",
+      "workspace"
+    ],
+    "publicEntryNames": [
+      "index.ts",
+      "index.tsx"
+    ],
+    "ignoredAssetExtensions": [
+      ".css",
+      ".svg",
+      ".png",
+      ".jpg",
+      ".jpeg",
+      ".webp",
+      ".gif"
+    ],
+    "baseUrlAliases": {
+      "src": "apps/canvas/src"
+    },
+    "maxDebtReviewDays": 180
+  },
+  "pythonBoundaries": {
+    "roots": [
+      {
+        "path": "services/runtime/ensemble_runtime",
+        "module": "ensemble_runtime"
+      },
+      {
+        "path": "runners",
+        "module": "runners"
+      },
+      {
+        "path": "services/runtime/tests",
+        "module": "tests"
+      }
+    ],
+    "excludedDirectories": [
+      ".venv",
+      "__pycache__",
+      ".pytest_cache",
+      ".ruff_cache"
+    ],
+    "layers": [
+      {
+        "name": "composition",
+        "path": "services/runtime/ensemble_runtime/__main__.py"
+      },
+      {
+        "name": "api",
+        "path": "services/runtime/ensemble_runtime/api"
+      },
+      {
+        "name": "run",
+        "path": "services/runtime/ensemble_runtime/run"
+      },
+      {
+        "name": "crew",
+        "path": "services/runtime/ensemble_runtime/crew"
+      },
+      {
+        "name": "persist",
+        "path": "services/runtime/ensemble_runtime/persist"
+      },
+      {
+        "name": "org",
+        "path": "services/runtime/ensemble_runtime/org"
+      },
+      {
+        "name": "ensemble-root",
+        "path": "services/runtime/ensemble_runtime"
+      },
+      {
+        "name": "runners",
+        "path": "runners"
+      }
+    ],
+    "allowedDependencies": {
+      "composition": [
+        "composition",
+        "api"
+      ],
+      "api": [
+        "api",
+        "run",
+        "persist"
+      ],
+      "run": [
+        "run",
+        "crew",
+        "persist",
+        "org",
+        "runners"
+      ],
+      "crew": [
+        "crew"
+      ],
+      "persist": [
+        "persist"
+      ],
+      "org": [
+        "org"
+      ],
+      "ensemble-root": [
+        "ensemble-root"
+      ],
+      "runners": [
+        "runners"
+      ]
+    }
+  },
+  "rustBoundaries": {
+    "roots": [
+      "crates/ensemble-runtime/src",
+      "src-tauri/src"
+    ],
+    "layers": [
+      "domain",
+      "application",
+      "infrastructure",
+      "adapter"
+    ],
+    "allowedDependencies": {
+      "domain": [
+        "domain"
+      ],
+      "application": [
+        "application",
+        "domain"
+      ],
+      "infrastructure": [
+        "infrastructure",
+        "domain"
+      ],
+      "adapter": [
+        "adapter",
+        "domain"
+      ]
+    }
+  },
+  "formatter": {
+    "roots": [
+      "apps/canvas/src",
+      "apps/canvas/vite.config.ts",
+      "apps/canvas/vitest.config.ts"
+    ],
+    "extensions": [
+      ".ts",
+      ".tsx"
+    ],
+    "maxDebtReviewDays": 180
+  }
+}

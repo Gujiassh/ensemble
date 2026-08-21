@@ -32,8 +32,7 @@ export const zhCN: MessageCatalog = {
   "app.connection.offline": "离线",
 
   "app.diagnostics.title": "诊断",
-  "app.diagnostics.connectionUnavailable":
-    "工作区服务没有响应。请重试连接，或重新启动 Ensemble。",
+  "app.diagnostics.connectionUnavailable": "工作区服务没有响应。请重试连接，或重新启动 Ensemble。",
 
   "app.context.noWorkspace": "暂无工作区",
   "app.context.viewCanvas": "画布",
@@ -57,8 +56,7 @@ export const zhCN: MessageCatalog = {
   "workspace.create.runnerHint": "只有状态为可用的 Runner 才能用于创建。",
   "workspace.create.runnerRetry": "重新探测",
   "workspace.create.outputLocaleLabel": "Agent 输出语言",
-  "workspace.create.outputLocaleHint":
-    "与界面语言相互独立。之后修改界面语言不会改变此值。",
+  "workspace.create.outputLocaleHint": "与界面语言相互独立。之后修改界面语言不会改变此值。",
   "workspace.create.reviewName": "名称",
   "workspace.create.reviewProject": "项目目录",
   "workspace.create.reviewRunner": "Runner",

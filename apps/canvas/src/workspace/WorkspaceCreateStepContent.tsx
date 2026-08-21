@@ -167,9 +167,7 @@ export function WorkspaceCreateStepContent({
                 >
                   <span className="runner-item__name">
                     {runner.displayName}
-                    {runner.id === "pi" && available
-                      ? ` · ${t("runner.probe.recommended")}`
-                      : ""}
+                    {runner.id === "pi" && available ? ` · ${t("runner.probe.recommended")}` : ""}
                   </span>
                   <StatusMark
                     tone={probeTone(runner.status)}
@@ -177,9 +175,7 @@ export function WorkspaceCreateStepContent({
                     busy={runner.status === "probing"}
                   />
                   <span className="runner-item__meta">
-                    {[runner.version, runner.capabilities.join(", ")]
-                      .filter(Boolean)
-                      .join(" · ")}
+                    {[runner.version, runner.capabilities.join(", ")].filter(Boolean).join(" · ")}
                   </span>
                 </button>
               );
@@ -190,11 +186,7 @@ export function WorkspaceCreateStepContent({
               {t(errorKey)}
             </p>
           ) : null}
-          <Button
-            variant="secondary"
-            loading={probing}
-            onClick={() => void onRetryProbe()}
-          >
+          <Button variant="secondary" loading={probing} onClick={() => void onRetryProbe()}>
             {t("workspace.create.runnerRetry")}
           </Button>
         </div>

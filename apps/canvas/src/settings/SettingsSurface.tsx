@@ -14,10 +14,7 @@ type SettingsSurfaceProps = {
   onClose: () => void;
 };
 
-export function SettingsSurface({
-  open,
-  onClose,
-}: SettingsSurfaceProps) {
+export function SettingsSurface({ open, onClose }: SettingsSurfaceProps) {
   const { t } = useI18n();
   const { preferences, setPreferences, resetPreferences } = usePreferences();
 

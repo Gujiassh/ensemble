@@ -7,10 +7,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      "@ensemble/protocol": path.resolve(
-        __dirname,
-        "../../packages/protocol/src/index.ts",
-      ),
+      "@ensemble/protocol": path.resolve(__dirname, "../../packages/protocol/src/index.ts"),
     },
   },
   server: {

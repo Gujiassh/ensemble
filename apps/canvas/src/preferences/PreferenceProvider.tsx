@@ -1,16 +1,6 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { applyAppearanceToElement } from "../design-system/tokens/applyAppearance";
-import {
-  readPlatformSignals,
-  resolveAppearance,
-} from "../design-system/tokens/resolveAppearance";
+import { readPlatformSignals, resolveAppearance } from "../design-system/tokens/resolveAppearance";
 import type { PreferenceAdapter } from "./adapter";
 import { PreferenceContext } from "./context";
 import {
@@ -25,11 +15,7 @@ type PreferenceProviderProps = {
   rootElement?: HTMLElement | null;
 };
 
-export function PreferenceProvider({
-  adapter,
-  children,
-  rootElement,
-}: PreferenceProviderProps) {
+export function PreferenceProvider({ adapter, children, rootElement }: PreferenceProviderProps) {
   const [preferences, setPreferencesState] = useState<DevicePreferences>(
     DEFAULT_DEVICE_PREFERENCES,
   );
@@ -160,7 +146,5 @@ export function PreferenceProvider({
     [preferences, diagnostics, appearance, ready, setPreferences, resetPreferences],
   );
 
-  return (
-    <PreferenceContext.Provider value={value}>{children}</PreferenceContext.Provider>
-  );
+  return <PreferenceContext.Provider value={value}>{children}</PreferenceContext.Provider>;
 }

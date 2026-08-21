@@ -6,10 +6,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@ensemble/protocol": path.resolve(
-        __dirname,
-        "../../packages/protocol/src/index.ts",
-      ),
+      "@ensemble/protocol": path.resolve(__dirname, "../../packages/protocol/src/index.ts"),
     },
   },
   test: {

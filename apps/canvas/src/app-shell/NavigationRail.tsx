@@ -1,10 +1,4 @@
-import {
-  AlertCircle,
-  FolderKanban,
-  PanelLeft,
-  PlayCircle,
-  Settings,
-} from "lucide-react";
+import { AlertCircle, FolderKanban, PanelLeft, PlayCircle, Settings } from "lucide-react";
 import { IconButton } from "../design-system/primitives";
 import { useI18n } from "../i18n/useI18n";
 

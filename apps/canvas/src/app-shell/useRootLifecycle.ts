@@ -91,8 +91,7 @@ export function useRootLifecycle({
       }
 
       const preferred =
-        workspaces.find((item) => item.id === lastWorkspaceIdRef.current) ??
-        workspaces[0]!;
+        workspaces.find((item) => item.id === lastWorkspaceIdRef.current) ?? workspaces[0]!;
       setModel((current) =>
         transition(current, {
           lifecycle: "workspace_loading",

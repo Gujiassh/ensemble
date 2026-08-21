@@ -59,14 +59,8 @@ export function InspectorShell({
       aria-label={t("inspector.title")}
     >
       <header className="inspector__header">
-        <h2 className="inspector__title">
-          {object ? object.label : t("inspector.title")}
-        </h2>
-        <IconButton
-          ref={closeRef}
-          label={t("inspector.close")}
-          onClick={onClose}
-        >
+        <h2 className="inspector__title">{object ? object.label : t("inspector.title")}</h2>
+        <IconButton ref={closeRef} label={t("inspector.close")} onClick={onClose}>
           <X size={16} aria-hidden="true" />
         </IconButton>
       </header>

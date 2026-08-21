@@ -2,12 +2,7 @@ import type { MessageKey } from "../i18n/catalog";
 import type { UiLocale } from "../preferences/schema";
 import type { OutputLocale } from "./gateway";
 
-export type WorkspaceCreateStep =
-  | "name"
-  | "project"
-  | "runner"
-  | "output-locale"
-  | "review";
+export type WorkspaceCreateStep = "name" | "project" | "runner" | "output-locale" | "review";
 
 export type WorkspaceCreateDraft = {
   name: string;
@@ -85,9 +80,7 @@ export function isOutputLocale(value: string): value is OutputLocale {
   return value === "zh-CN" || value === "en-US";
 }
 
-export function outputLocaleMessageKey(
-  locale: OutputLocale,
-): "locale.zh-CN" | "locale.en-US" {
+export function outputLocaleMessageKey(locale: OutputLocale): "locale.zh-CN" | "locale.en-US" {
   return locale === "zh-CN" ? "locale.zh-CN" : "locale.en-US";
 }
 

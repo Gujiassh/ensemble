@@ -1,21 +1,8 @@
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Circle,
-  Info,
-  LoaderCircle,
-  XCircle,
-} from "lucide-react";
+import { AlertTriangle, CheckCircle2, Circle, Info, LoaderCircle, XCircle } from "lucide-react";
 import type { ReactNode } from "react";
 
 export type StatusTone =
-  | "neutral"
-  | "active"
-  | "waiting"
-  | "success"
-  | "danger"
-  | "unavailable"
-  | "info";
+  "neutral" | "active" | "waiting" | "success" | "danger" | "unavailable" | "info";
 
 type StatusMarkProps = {
   tone: StatusTone;
@@ -35,11 +22,7 @@ const ICONS: Record<StatusTone, ReactNode> = {
 
 export function StatusMark({ tone, label, busy = false }: StatusMarkProps) {
   return (
-    <span
-      className={`ds-status ds-status--${tone}`}
-      data-busy={busy || undefined}
-      role="status"
-    >
+    <span className={`ds-status ds-status--${tone}`} data-busy={busy || undefined} role="status">
       <span className="ds-status__icon" aria-hidden="true">
         {ICONS[tone]}
       </span>

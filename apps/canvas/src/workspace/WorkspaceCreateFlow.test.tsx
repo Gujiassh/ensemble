@@ -70,9 +70,7 @@ describe("WorkspaceCreateFlow", () => {
     const dialog = await screen.findByRole("dialog", { name: "Create workspace" });
     await user.type(within(dialog).getByLabelText("Workspace name"), "Dirty");
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
-    expect(
-      await screen.findByRole("dialog", { name: "Discard draft?" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "Discard draft?" })).toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Create workspace" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Keep editing" }));

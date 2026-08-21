@@ -127,7 +127,9 @@ def project_org_to_crew(
         )
         agents.append(agent)
         task_id = f"task_{seat_id}"
-        depends: tuple[str, ...] = (prev_task_id,) if prev_task_id and process == "sequential" else ()
+        depends: tuple[str, ...] = (
+            (prev_task_id,) if prev_task_id and process == "sequential" else ()
+        )
         tasks.append(
             ProjectedTask(
                 task_id=task_id,

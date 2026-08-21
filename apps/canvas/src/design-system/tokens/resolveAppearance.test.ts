@@ -60,15 +60,12 @@ describe("appearance resolver", () => {
 
   it("applies only semantic CSS variables to the root", () => {
     const element = document.createElement("div");
-    applyAppearanceToElement(
-      element,
-      {
-        theme: "light",
-        density: "comfortable",
-        motion: "full",
-        contrast: "normal",
-      },
-    );
+    applyAppearanceToElement(element, {
+      theme: "light",
+      density: "comfortable",
+      motion: "full",
+      contrast: "normal",
+    });
 
     for (const name of SEMANTIC_TOKEN_NAMES) {
       expect(element.style.getPropertyValue(name)).not.toBe("");

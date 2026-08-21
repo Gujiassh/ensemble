@@ -32,9 +32,7 @@ export function SegmentedControl<T extends string>({
           return (
             <label
               key={option.value}
-              className={
-                selected ? "ds-segmented__option is-selected" : "ds-segmented__option"
-              }
+              className={selected ? "ds-segmented__option is-selected" : "ds-segmented__option"}
             >
               <input
                 type="radio"

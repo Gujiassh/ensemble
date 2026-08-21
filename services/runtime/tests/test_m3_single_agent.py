@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
-import tempfile
 
 import pytest
 
@@ -35,9 +33,7 @@ async def test_single_agent_writes_artifacts(data_dir):
     assert (art / "01-plan.md").exists()
     assert (art / "02-output.md").exists()
     assert (persist.workspace_dir("ws_beta") / "org" / "tree.json").exists()
-    state = json.loads(
-        (persist.run_dir("ws_beta", run_id) / "state.json").read_text()
-    )
+    state = json.loads((persist.run_dir("ws_beta", run_id) / "state.json").read_text())
     assert state["status"] == "waiting_human"
     types = [e["type"] for e in reg.bus.history_after("ws_beta", None)]
     assert "bubble.upsert" in types
@@ -54,7 +50,5 @@ async def test_contract_failure(data_dir):
         prompt="x",
         fail_contract=True,
     )
-    state = json.loads(
-        (persist.run_dir("ws_beta", "run_fail") / "state.json").read_text()
-    )
+    state = json.loads((persist.run_dir("ws_beta", "run_fail") / "state.json").read_text())
     assert state["status"] == "failed"

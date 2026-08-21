@@ -30,9 +30,7 @@ export function Select({
   const selectId = id ?? generatedId;
   const hintId = `${selectId}-hint`;
   const errorId = `${selectId}-error`;
-  const describedBy = [hint ? hintId : null, error ? errorId : null]
-    .filter(Boolean)
-    .join(" ");
+  const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(" ");
 
   return (
     <div className={["ds-field", className].filter(Boolean).join(" ")}>

@@ -6,9 +6,7 @@ import { enUS } from "./locales/en-US";
 describe("i18n catalog", () => {
   it("covers every en-US key in zh-CN", () => {
     expect(() => assertCatalogCoverage()).not.toThrow();
-    expect(Object.keys(CATALOGS["zh-CN"]).sort()).toEqual(
-      Object.keys(enUS).sort(),
-    );
+    expect(Object.keys(CATALOGS["zh-CN"]).sort()).toEqual(Object.keys(enUS).sort());
   });
 
   it("fails loudly for missing keys at translate time", () => {

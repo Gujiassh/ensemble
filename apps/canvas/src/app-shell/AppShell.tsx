@@ -34,22 +34,20 @@ export function AppShell({ gateway, projectionForWorkspace }: AppShellProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedObject, setSelectedObject] = useState<CanvasObject | null>(null);
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const [inspectorReturnTarget, setInspectorReturnTarget] =
-    useState<HTMLElement | null>(null);
+  const [inspectorReturnTarget, setInspectorReturnTarget] = useState<HTMLElement | null>(null);
   const width = useWindowWidth();
 
   const persistLastWorkspaceId = useCallback(
     (workspaceId: string) => setPreferences({ lastWorkspaceId: workspaceId }),
     [setPreferences],
   );
-  const { model, activeWorkspace, bootstrap, confirmCreatedWorkspace } =
-    useRootLifecycle({
-      gateway,
-      preferencesReady,
-      preferenceDiagnostics,
-      lastWorkspaceId: preferences.lastWorkspaceId,
-      persistLastWorkspaceId,
-    });
+  const { model, activeWorkspace, bootstrap, confirmCreatedWorkspace } = useRootLifecycle({
+    gateway,
+    preferencesReady,
+    preferenceDiagnostics,
+    lastWorkspaceId: preferences.lastWorkspaceId,
+    persistLastWorkspaceId,
+  });
 
   const canvasState: CanvasViewportState = useMemo(() => {
     if (model.lifecycle === "workspace_loading") {
@@ -76,12 +74,15 @@ export function AppShell({ gateway, projectionForWorkspace }: AppShellProps) {
     }
   }
 
-  const handleCreated = useCallback((workspaceId: string) => {
-    setCreateOpen(false);
-    setSelectedObject(null);
-    setInspectorOpen(false);
-    void confirmCreatedWorkspace(workspaceId);
-  }, [confirmCreatedWorkspace]);
+  const handleCreated = useCallback(
+    (workspaceId: string) => {
+      setCreateOpen(false);
+      setSelectedObject(null);
+      setInspectorOpen(false);
+      void confirmCreatedWorkspace(workspaceId);
+    },
+    [confirmCreatedWorkspace],
+  );
 
   const handleSelectObject = useCallback((object: CanvasObject | null, trigger?: HTMLElement) => {
     if (object && trigger) {
@@ -155,14 +156,10 @@ export function AppShell({ gateway, projectionForWorkspace }: AppShellProps) {
           projectPath={activeWorkspace?.projectPath ?? null}
           connection={model.connection}
           primaryActionLabel={
-            canOpenWorkspaceCreate(model.lifecycle)
-              ? t("app.context.createWorkspace")
-              : undefined
+            canOpenWorkspaceCreate(model.lifecycle) ? t("app.context.createWorkspace") : undefined
           }
           onPrimaryAction={
-            canOpenWorkspaceCreate(model.lifecycle)
-              ? () => setCreateOpen(true)
-              : undefined
+            canOpenWorkspaceCreate(model.lifecycle) ? () => setCreateOpen(true) : undefined
           }
           primaryDisabled={model.connection.status !== "available"}
         />

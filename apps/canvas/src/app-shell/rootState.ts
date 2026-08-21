@@ -29,12 +29,7 @@ const ALLOWED_TRANSITIONS: Record<RootLifecycleState, readonly RootLifecycleStat
     "no_workspace",
     "workspace_loading",
   ],
-  checking_backend: [
-    "checking_backend",
-    "startup_error",
-    "no_workspace",
-    "workspace_loading",
-  ],
+  checking_backend: ["checking_backend", "startup_error", "no_workspace", "workspace_loading"],
   startup_error: ["startup_error", "checking_backend"],
   no_workspace: ["no_workspace", "workspace_loading"],
   workspace_loading: ["workspace_loading", "ready", "startup_error"],
@@ -62,9 +57,7 @@ export function transition(
   patch: Partial<RootModel> & { lifecycle: RootLifecycleState },
 ): RootModel {
   if (!ALLOWED_TRANSITIONS[model.lifecycle].includes(patch.lifecycle)) {
-    throw new Error(
-      `Invalid root lifecycle transition: ${model.lifecycle} -> ${patch.lifecycle}`,
-    );
+    throw new Error(`Invalid root lifecycle transition: ${model.lifecycle} -> ${patch.lifecycle}`);
   }
   return {
     ...model,

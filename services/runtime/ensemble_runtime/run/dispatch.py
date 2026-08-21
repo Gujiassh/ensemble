@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import Any
 
 _REPO = Path(__file__).resolve().parents[4]
 if str(_REPO) not in sys.path:

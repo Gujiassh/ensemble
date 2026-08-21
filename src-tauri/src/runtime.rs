@@ -169,52 +169,84 @@ fn spawn_runtime(repo_root: &Path) -> Result<Child, String> {
 
     // Own process group so exit can kill the whole tree (uvicorn workers etc.).
     #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        unsafe {
-            cmd.pre_exec(|| {
-                if unix_pg::setpgid(0, 0) != 0 {
-                    return Err(std::io::Error::last_os_error());
-                }
-                Ok(())
-            });
-        }
-    }
+    configure_owned_process_group(&mut cmd);
 
     cmd.spawn()
         .map_err(|e| format!("spawn ensemble_runtime failed: {e}"))
 }
 
 #[cfg(unix)]
+fn configure_owned_process_group(command: &mut Command) {
+    use std::os::unix::process::CommandExt;
+
+    // SAFETY: The closure captures no state and, after fork, only calls the
+    // async-signal-safe `setpgid(0, 0)`. On failure it constructs the OS error
+    // value expected by `pre_exec`; it performs no allocation, locking, or access
+    // to state that may have been held by another thread at fork time.
+    unsafe {
+        command.pre_exec(unix_pg::become_process_group_leader);
+    }
+}
+
+#[cfg(unix)]
 mod unix_pg {
-    pub unsafe fn setpgid(pid: i32, pgid: i32) -> i32 {
-        extern "C" {
-            fn setpgid(pid: i32, pgid: i32) -> i32;
-        }
-        setpgid(pid, pgid)
+    use std::io;
+
+    unsafe extern "C" {
+        fn setpgid(pid: i32, pgid: i32) -> i32;
+        fn killpg(pgid: i32, sig: i32) -> i32;
     }
 
-    pub unsafe fn killpg(pgid: i32, sig: i32) -> i32 {
-        extern "C" {
-            fn killpg(pgid: i32, sig: i32) -> i32;
-        }
-        killpg(pgid, sig)
+    #[derive(Clone, Copy)]
+    pub enum Signal {
+        Terminate,
+        Kill,
     }
 
-    pub const SIGTERM: i32 = 15;
-    pub const SIGKILL: i32 = 9;
+    impl Signal {
+        const fn as_raw(self) -> i32 {
+            match self {
+                Self::Terminate => 15,
+                Self::Kill => 9,
+            }
+        }
+    }
+
+    pub fn become_process_group_leader() -> io::Result<()> {
+        // SAFETY: Zero for both arguments is defined by POSIX to select the
+        // calling process and its own PID. `setpgid` takes only integer values,
+        // dereferences no Rust memory, and is async-signal-safe for `pre_exec`.
+        if unsafe { setpgid(0, 0) } == 0 {
+            Ok(())
+        } else {
+            Err(io::Error::last_os_error())
+        }
+    }
+
+    pub fn signal_process_group(pgid: u32, signal: Signal) -> io::Result<()> {
+        let pgid = i32::try_from(pgid)
+            .ok()
+            .filter(|pgid| *pgid > 0)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "invalid process group"))?;
+
+        // SAFETY: `pgid` was checked to be a positive `pid_t`, so `killpg`
+        // cannot select the caller's group through the special zero value. The
+        // private caller supplies the PID of a still-owned child whose `pre_exec`
+        // path made that PID its process-group ID. The signal is a POSIX constant,
+        // and `killpg` dereferences no Rust memory.
+        if unsafe { killpg(pgid, signal.as_raw()) } == 0 {
+            Ok(())
+        } else {
+            Err(io::Error::last_os_error())
+        }
+    }
 }
 
 #[cfg(unix)]
 fn kill_process_tree(pid: u32) {
-    let pgid = pid as i32;
-    unsafe {
-        let _ = unix_pg::killpg(pgid, unix_pg::SIGTERM);
-    }
+    let _ = unix_pg::signal_process_group(pid, unix_pg::Signal::Terminate);
     std::thread::sleep(Duration::from_millis(400));
-    unsafe {
-        let _ = unix_pg::killpg(pgid, unix_pg::SIGKILL);
-    }
+    let _ = unix_pg::signal_process_group(pid, unix_pg::Signal::Kill);
 }
 
 #[cfg(not(unix))]
@@ -284,9 +316,7 @@ mod tests {
     fn health_ok_is_false_when_nothing_listens() {
         // If a real runtime is already up on :18427 this would be true — skip then.
         if TcpStream::connect_timeout(
-            &format!("{RUNTIME_HOST}:{RUNTIME_PORT}")
-                .parse()
-                .unwrap(),
+            &format!("{RUNTIME_HOST}:{RUNTIME_PORT}").parse().unwrap(),
             Duration::from_millis(50),
         )
         .is_ok()
@@ -298,13 +328,183 @@ mod tests {
     }
 
     #[test]
-    fn resolve_paths_look_like_monorepo() {
+    fn resolve_paths_match_monorepo_layout() {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .expect("repo root")
             .to_path_buf();
+        assert!(root.join("package.json").is_file());
         assert!(root.join("apps/canvas").is_dir());
         assert!(root.join("services/runtime").is_dir());
-        assert!(runtime_python(&root).exists() || !runtime_python(&root).exists());
+        assert_eq!(
+            runtime_python(&root),
+            root.join("services/runtime/.venv/bin/python")
+        );
+        assert_eq!(data_dir(&root), root.join("data"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn process_group_signal_rejects_zero_pgid() {
+        let error = unix_pg::signal_process_group(0, unix_pg::Signal::Terminate)
+            .expect_err("zero must not select the caller's process group");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+    }
+
+    #[cfg(unix)]
+    const FIXTURE_BUDGET: Duration = Duration::from_secs(2);
+
+    #[cfg(unix)]
+    struct ProcessGroupFixture {
+        leader: Option<Child>,
+        temp_dir: PathBuf,
+    }
+
+    #[cfg(unix)]
+    impl ProcessGroupFixture {
+        fn terminate_and_reap(&mut self) -> Result<std::process::ExitStatus, String> {
+            let leader = self.leader.as_mut().expect("fixture leader");
+            kill_process_tree(leader.id());
+            let status = wait_for_child_exit(leader, FIXTURE_BUDGET)
+                .map_err(|error| format!("inspect fixture leader: {error}"))?
+                .ok_or_else(|| "fixture leader did not exit after process-group kill".to_owned())?;
+            self.leader = None;
+            Ok(status)
+        }
+    }
+
+    #[cfg(unix)]
+    impl Drop for ProcessGroupFixture {
+        fn drop(&mut self) {
+            if let Some(mut leader) = self.leader.take() {
+                // Signal the group before any wait can reap the leader and release
+                // its PID. This keeps the group identity unavailable for reuse.
+                kill_process_tree(leader.id());
+                if !matches!(
+                    wait_for_child_exit(&mut leader, FIXTURE_BUDGET),
+                    Ok(Some(_))
+                ) {
+                    let _ = leader.kill();
+                    let _ = wait_for_child_exit(&mut leader, FIXTURE_BUDGET);
+                }
+            }
+            let _ = std::fs::remove_dir_all(&self.temp_dir);
+        }
+    }
+
+    #[cfg(unix)]
+    fn wait_for_child_exit(
+        child: &mut Child,
+        budget: Duration,
+    ) -> std::io::Result<Option<std::process::ExitStatus>> {
+        let deadline = Instant::now() + budget;
+        loop {
+            if let Some(status) = child.try_wait()? {
+                return Ok(Some(status));
+            }
+            if Instant::now() >= deadline {
+                return Ok(None);
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    #[cfg(unix)]
+    fn wait_for_file(path: &Path, budget: Duration) -> Result<String, String> {
+        let deadline = Instant::now() + budget;
+        loop {
+            match std::fs::read_to_string(path) {
+                Ok(value) if !value.trim().is_empty() => return Ok(value),
+                Ok(_) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(format!("read {}: {error}", path.display())),
+            }
+            if Instant::now() >= deadline {
+                return Err(format!("timed out waiting for {}", path.display()));
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn kill_process_tree_terminates_owned_descendant() {
+        use std::sync::mpsc;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock after Unix epoch")
+            .as_nanos();
+        let temp_dir = std::env::temp_dir().join(format!(
+            "ensemble-process-group-{}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir(&temp_dir).expect("create process-group fixture directory");
+        let pid_file = temp_dir.join("descendant.pid");
+        let ready_file = temp_dir.join("descendant.ready");
+
+        let mut command = Command::new("sh");
+        command
+            .args([
+                "-c",
+                r#"sh -c 'printf ready > "$ENSEMBLE_CHILD_READY_FILE"; exec sleep 5' &
+descendant=$!
+trap '' TERM
+printf '%s\n' "$descendant" > "$ENSEMBLE_CHILD_PID_FILE"
+wait "$descendant""#,
+            ])
+            .env("ENSEMBLE_CHILD_PID_FILE", &pid_file)
+            .env("ENSEMBLE_CHILD_READY_FILE", &ready_file)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null());
+        configure_owned_process_group(&mut command);
+
+        let mut fixture = ProcessGroupFixture {
+            leader: None,
+            temp_dir,
+        };
+        fixture.leader = Some(command.spawn().expect("spawn owned process-group fixture"));
+        let leader = fixture.leader.as_mut().expect("fixture leader");
+        let leader_pid = leader.id();
+        let mut stdout = leader.stdout.take().expect("fixture stdout");
+        let (stdout_closed_tx, stdout_closed_rx) = mpsc::sync_channel(1);
+        std::thread::spawn(move || {
+            let mut sink = std::io::sink();
+            let result = std::io::copy(&mut stdout, &mut sink).map(|_| ());
+            let _ = stdout_closed_tx.send(result);
+        });
+
+        let descendant_pid = wait_for_file(&pid_file, FIXTURE_BUDGET)
+            .expect("capture descendant PID")
+            .trim()
+            .parse::<u32>()
+            .expect("descendant PID is an integer");
+        assert_ne!(descendant_pid, 0);
+        assert_ne!(descendant_pid, leader_pid);
+        assert_eq!(
+            wait_for_file(&ready_file, FIXTURE_BUDGET)
+                .expect("descendant readiness")
+                .trim(),
+            "ready"
+        );
+        assert!(matches!(
+            stdout_closed_rx.try_recv(),
+            Err(mpsc::TryRecvError::Empty)
+        ));
+
+        let status = fixture
+            .terminate_and_reap()
+            .expect("terminate and reap fixture leader");
+        assert!(!status.success());
+
+        // The descendant keeps this pipe open across exec for its full lifetime.
+        // EOF therefore proves that exact process exited, without querying a PID
+        // that could have been reused after the leader reaped it.
+        stdout_closed_rx
+            .recv_timeout(FIXTURE_BUDGET)
+            .expect("descendant kept stdout open after process-group kill")
+            .expect("read fixture stdout");
     }
 }

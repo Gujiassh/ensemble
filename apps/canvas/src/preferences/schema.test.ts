@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createMemoryPreferenceAdapter } from "./adapter";
-import {
-  DEFAULT_DEVICE_PREFERENCES,
-  validateDevicePreferences,
-} from "./schema";
+import { DEFAULT_DEVICE_PREFERENCES, validateDevicePreferences } from "./schema";
 
 describe("device preferences", () => {
   it("returns defaults for invalid payloads and records diagnostics", () => {

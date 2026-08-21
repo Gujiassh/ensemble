@@ -88,10 +88,7 @@ export function validateDevicePreferences(input: unknown): {
     diagnostics.push({ field: "theme", code: "invalid_value" });
   }
 
-  if (
-    typeof input.density === "string" &&
-    DENSITIES.has(input.density as DensityPreference)
-  ) {
+  if (typeof input.density === "string" && DENSITIES.has(input.density as DensityPreference)) {
     preferences.density = input.density as DensityPreference;
   } else if ("density" in input) {
     diagnostics.push({ field: "density", code: "invalid_value" });
@@ -103,10 +100,7 @@ export function validateDevicePreferences(input: unknown): {
     diagnostics.push({ field: "motion", code: "invalid_value" });
   }
 
-  if (
-    typeof input.contrast === "string" &&
-    CONTRASTS.has(input.contrast as ContrastPreference)
-  ) {
+  if (typeof input.contrast === "string" && CONTRASTS.has(input.contrast as ContrastPreference)) {
     preferences.contrast = input.contrast as ContrastPreference;
   } else if ("contrast" in input) {
     diagnostics.push({ field: "contrast", code: "invalid_value" });

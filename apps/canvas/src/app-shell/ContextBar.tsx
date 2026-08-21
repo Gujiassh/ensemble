@@ -52,16 +52,12 @@ export function ContextBar({
   return (
     <header className="context-bar">
       <div className="context-bar__identity">
-        <h1 className="context-bar__title">
-          {workspaceName ?? t("app.context.noWorkspace")}
-        </h1>
+        <h1 className="context-bar__title">{workspaceName ?? t("app.context.noWorkspace")}</h1>
         <div className="context-bar__meta">
           <span>{t("app.context.viewCanvas")}</span>
           <span aria-hidden="true"> · </span>
           <span title={projectPath ?? undefined}>
-            {projectPath
-              ? summarizePath(projectPath)
-              : t("app.context.directoryUnavailable")}
+            {projectPath ? summarizePath(projectPath) : t("app.context.directoryUnavailable")}
           </span>
         </div>
       </div>
@@ -72,11 +68,7 @@ export function ContextBar({
           busy={connection.status === "checking"}
         />
         {primaryActionLabel && onPrimaryAction ? (
-          <Button
-            variant="primary"
-            onClick={onPrimaryAction}
-            disabled={primaryDisabled}
-          >
+          <Button variant="primary" onClick={onPrimaryAction} disabled={primaryDisabled}>
             {primaryActionLabel}
           </Button>
         ) : null}

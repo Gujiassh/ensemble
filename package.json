@@ -9,16 +9,33 @@
     "lint:canvas": "pnpm --filter @ensemble/canvas lint",
     "typecheck:canvas": "pnpm --filter @ensemble/canvas typecheck",
     "dev:runtime": "cd services/runtime && .venv/bin/python -m ensemble_runtime",
-    "test:runtime": "cd services/runtime && .venv/bin/pytest -q",
+    "test:runtime": "uv run --project services/runtime --extra dev --locked --python 3.12.3 pytest -q services/runtime/tests runners/mock runners/pi",
     "dev": "echo \"Run: pnpm dev:runtime (terminal A) && pnpm dev:canvas (terminal B)\"",
     "dev:desktop": "pnpm exec tauri dev",
-    "build:desktop": "pnpm exec tauri build"
+    "build:desktop": "pnpm exec tauri build",
+    "test:canvas": "pnpm --filter @ensemble/canvas test",
+    "quality:scripts:test": "node --test scripts/quality/*.test.mjs && uv run --project services/runtime --extra dev --locked --python 3.12.3 python -m unittest scripts.quality.test_python_boundaries scripts.quality.test_validate_config",
+    "quality:shape": "node scripts/quality/source-shape.mjs",
+    "quality:boundaries": "node scripts/quality/import-boundaries.mjs",
+    "quality:links": "node scripts/quality/markdown-links.mjs",
+    "quality:frontend": "pnpm lint:canvas && pnpm typecheck:canvas && pnpm test:canvas && pnpm build:canvas",
+    "quality:rust:runtime": "cargo fmt --manifest-path crates/ensemble-runtime/Cargo.toml --check && cargo clippy --manifest-path crates/ensemble-runtime/Cargo.toml --locked --lib --bins --all-features -- -D warnings -D clippy::unwrap_used -D clippy::await_holding_lock -D clippy::undocumented_unsafe_blocks && cargo clippy --manifest-path crates/ensemble-runtime/Cargo.toml --locked --all-targets --all-features -- -D warnings -D clippy::await_holding_lock -D clippy::undocumented_unsafe_blocks && cargo test --manifest-path crates/ensemble-runtime/Cargo.toml --locked --all-features",
+    "quality:rust:tauri:check": "cargo fmt --manifest-path src-tauri/Cargo.toml --check && cargo clippy --manifest-path src-tauri/Cargo.toml --locked --lib --bins --all-features -- -D warnings -D clippy::unwrap_used -D clippy::await_holding_lock -D clippy::undocumented_unsafe_blocks && cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets --all-features -- -D warnings -D clippy::await_holding_lock -D clippy::undocumented_unsafe_blocks && cargo test --manifest-path src-tauri/Cargo.toml --locked --all-features",
+    "quality:rust:tauri": "pnpm build:canvas && pnpm quality:rust:tauri:check",
+    "quality": "pnpm quality:scripts:test && pnpm quality:hygiene && pnpm quality:config && pnpm quality:shape && pnpm quality:boundaries && pnpm quality:boundaries:python && pnpm quality:boundaries:rust && pnpm quality:links && pnpm quality:format && pnpm quality:frontend && pnpm quality:python && pnpm quality:rust:runtime && pnpm quality:rust:tauri:check",
+    "quality:python": "uv sync --project services/runtime --extra dev --locked --python 3.12.3 && uv run --project services/runtime --extra dev --locked --python 3.12.3 ruff check services/runtime/ensemble_runtime services/runtime/tests && uv run --project services/runtime --extra dev --locked --python 3.12.3 ruff --config services/runtime/pyproject.toml check runners scripts/quality && uv run --project services/runtime --extra dev --locked --python 3.12.3 ruff format --check services/runtime/ensemble_runtime services/runtime/tests && uv run --project services/runtime --extra dev --locked --python 3.12.3 ruff --config services/runtime/pyproject.toml format --check runners scripts/quality && uv run --project services/runtime --extra dev --locked --python 3.12.3 pytest -q services/runtime/tests runners/mock runners/pi",
+    "quality:hygiene": "node scripts/quality/repository-hygiene.mjs",
+    "quality:config": "uv run --project services/runtime --extra dev --locked --python 3.12.3 python scripts/quality/validate_config.py",
+    "quality:format": "node scripts/quality/frontend-format.mjs",
+    "quality:boundaries:python": "uv run --project services/runtime --extra dev --locked --python 3.12.3 python scripts/quality/python_boundaries.py",
+    "quality:boundaries:rust": "node scripts/quality/rust-boundaries.mjs"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.22.0 <23"
   },
   "packageManager": "pnpm@9.15.0",
   "devDependencies": {
-    "@tauri-apps/cli": "^2"
+    "@tauri-apps/cli": "^2",
+    "prettier": "3.9.6"
   }
 }

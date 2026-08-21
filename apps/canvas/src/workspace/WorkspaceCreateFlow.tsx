@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Button,
-  Dialog,
-} from "../design-system/primitives";
+import { Button, Dialog } from "../design-system/primitives";
 import { useI18n } from "../i18n/useI18n";
 import type { MessageKey } from "../i18n/catalog";
 import type { UiLocale } from "../preferences/schema";
@@ -13,11 +10,7 @@ import {
   validateWorkspaceName,
   type WorkspaceCreateDraft,
 } from "./draft";
-import type {
-  RunnerProbeResult,
-  WorkspaceCreateInput,
-  WorkspaceGateway,
-} from "./gateway";
+import type { RunnerProbeResult, WorkspaceCreateInput, WorkspaceGateway } from "./gateway";
 import { WorkspaceCreateStepContent } from "./WorkspaceCreateStepContent";
 
 type WorkspaceCreateFlowProps = {
@@ -36,9 +29,7 @@ export function WorkspaceCreateFlow({
   onCreated,
 }: WorkspaceCreateFlowProps) {
   const { t } = useI18n();
-  const [draft, setDraft] = useState<WorkspaceCreateDraft>(() =>
-    createEmptyDraft(uiLocale),
-  );
+  const [draft, setDraft] = useState<WorkspaceCreateDraft>(() => createEmptyDraft(uiLocale));
   const [errorKey, setErrorKey] = useState<MessageKey | null>(null);
   const [submitErrorKey, setSubmitErrorKey] = useState<MessageKey | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -235,11 +226,7 @@ export function WorkspaceCreateFlow({
     if (!validateCurrentStep()) {
       return;
     }
-    if (
-      !draft.projectPath ||
-      !draft.runnerProfileId ||
-      !draft.name.trim()
-    ) {
+    if (!draft.projectPath || !draft.runnerProfileId || !draft.name.trim()) {
       return;
     }
 
@@ -320,11 +307,7 @@ export function WorkspaceCreateFlow({
             </div>
             <div className="workspace-create__primary-actions">
               {draft.step === "review" ? (
-                <Button
-                  variant="primary"
-                  loading={submitting}
-                  onClick={() => void handleSubmit()}
-                >
+                <Button variant="primary" loading={submitting} onClick={() => void handleSubmit()}>
                   {t("workspace.create.submit")}
                 </Button>
               ) : (

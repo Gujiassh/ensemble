@@ -25,9 +25,7 @@ def ensure_workspace(workspace_id: str, workspace: dict[str, Any], org: dict[str
     d = workspace_dir(workspace_id)
     (d / "org").mkdir(parents=True, exist_ok=True)
     (d / "runs").mkdir(parents=True, exist_ok=True)
-    (d / "workspace.json").write_text(
-        json.dumps(workspace, indent=2) + "\n", encoding="utf-8"
-    )
+    (d / "workspace.json").write_text(json.dumps(workspace, indent=2) + "\n", encoding="utf-8")
     save_org(workspace_id, org)
     return d
 

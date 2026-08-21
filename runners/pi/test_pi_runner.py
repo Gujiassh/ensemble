@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from runners.mock import RunnerJob
 from runners.pi import pi_available, run_pi
 

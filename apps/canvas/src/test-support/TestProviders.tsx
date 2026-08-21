@@ -1,14 +1,8 @@
 import type { ReactNode } from "react";
 import { I18nProvider } from "../i18n/I18nProvider";
-import {
-  createMemoryPreferenceAdapter,
-  type PreferenceAdapter,
-} from "../preferences/adapter";
+import { createMemoryPreferenceAdapter, type PreferenceAdapter } from "../preferences/adapter";
 import { PreferenceProvider } from "../preferences/PreferenceProvider";
-import {
-  DEFAULT_DEVICE_PREFERENCES,
-  type DevicePreferences,
-} from "../preferences/schema";
+import { DEFAULT_DEVICE_PREFERENCES, type DevicePreferences } from "../preferences/schema";
 
 type TestProvidersProps = {
   children: ReactNode;
@@ -16,11 +10,7 @@ type TestProvidersProps = {
   adapter?: PreferenceAdapter;
 };
 
-export function TestProviders({
-  children,
-  preferences,
-  adapter,
-}: TestProvidersProps) {
+export function TestProviders({ children, preferences, adapter }: TestProvidersProps) {
   const preferenceAdapter =
     adapter ??
     createMemoryPreferenceAdapter({

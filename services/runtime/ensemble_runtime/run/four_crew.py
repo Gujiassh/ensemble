@@ -10,11 +10,11 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from ensemble_runtime.crew import CrewAIMode, get_crewai_mode, project_org_to_crew
+from runners.mock import RunnerJob
+
+from ensemble_runtime.crew import get_crewai_mode, project_org_to_crew
 from ensemble_runtime.persist import store as persist
 from ensemble_runtime.run.dispatch import resolve_runner, run_job
-
-from runners.mock import RunnerJob
 
 SEAT_ARTIFACTS = {
     "seat_pm": ["01-brief.md"],
@@ -262,9 +262,9 @@ async def run_four_crew_pipeline(
                 "mode": str(proj.mode.value if hasattr(proj.mode, "value") else proj.mode),
                 "process": proj.process,
                 "skipped": proj.skipped,
-                "agent_ids": proj.agent_ids() if not (proj.skipped or not proj.tasks) else [
-                    "seat_pm", "seat_res", "seat_eng", "seat_rev"
-                ],
+                "agent_ids": proj.agent_ids()
+                if not (proj.skipped or not proj.tasks)
+                else ["seat_pm", "seat_res", "seat_eng", "seat_rev"],
                 "task_ids": [t.task_id for t in tasks],
             },
         },

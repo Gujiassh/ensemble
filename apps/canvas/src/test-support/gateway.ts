@@ -45,14 +45,14 @@ export function createTestGateway(options: TestGatewayOptions = {}): WorkspaceGa
     },
     async probeRunnerProfiles(onResult, operationOptions) {
       const runners = options.runners ?? [
-          {
-            id: "pi",
-            displayName: "pi",
-            status: "available",
-            version: "1.0.0",
-            capabilities: ["code"],
-          },
-        ];
+        {
+          id: "pi",
+          displayName: "pi",
+          status: "available",
+          version: "1.0.0",
+          capabilities: ["code"],
+        },
+      ];
       await Promise.all(
         runners.map(async (runner) => {
           const delayMs = options.runnerDelaysMs?.[runner.id] ?? 0;

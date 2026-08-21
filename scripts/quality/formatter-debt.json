@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "files": [
+    {
+      "path": "apps/canvas/src/test-support/AgentSessionPreview.tsx",
+      "owner": "Canvas visual preview owner",
+      "reason": "This dirty temporary visual preview is frozen and excluded from broad formatter adoption.",
+      "contentSha256": "671c5ec2d3ee112e612a7283b280222e236fea10267ec78a4e476b46a53ff107",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "path": "apps/canvas/src/test-support/DiscordUiPreview.test.tsx",
+      "owner": "Canvas visual preview owner",
+      "reason": "This dirty temporary visual preview is frozen and excluded from broad formatter adoption.",
+      "contentSha256": "6b98197321cd79155857533034b25f0870b064cc29fd46563a9078462c6c901d",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "path": "apps/canvas/src/test-support/DiscordUiPreview.tsx",
+      "owner": "Canvas visual preview owner",
+      "reason": "This dirty temporary visual preview is frozen and excluded from broad formatter adoption.",
+      "contentSha256": "3b9daae895132ce47e1f9c543cd96d078ea26a5df224dc0acffac07789ad6848",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "path": "apps/canvas/src/test-support/OutputInspectionPreview.tsx",
+      "owner": "Canvas visual preview owner",
+      "reason": "This dirty temporary visual preview is frozen and excluded from broad formatter adoption.",
+      "contentSha256": "f77b02bccc04f8864fca9840b7c7cb5574654a5ea4145b9ef1b10745a292e3b8",
+      "reviewBy": "2026-12-31"
+    }
+  ]
+}

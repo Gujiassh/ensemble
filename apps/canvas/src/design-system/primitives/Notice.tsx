@@ -19,10 +19,7 @@ const TONE_MAP: Record<NoticeTone, StatusTone> = {
 
 export function Notice({ tone, title, children, action }: NoticeProps) {
   return (
-    <div
-      className={`ds-notice ds-notice--${tone}`}
-      role={tone === "danger" ? "alert" : "status"}
-    >
+    <div className={`ds-notice ds-notice--${tone}`} role={tone === "danger" ? "alert" : "status"}>
       <div className="ds-notice__header">
         <StatusMark tone={TONE_MAP[tone]} label={title} />
       </div>

@@ -16,10 +16,7 @@ export type PlatformSignals = {
   forcedColorsActive: boolean;
 };
 
-export function resolveTheme(
-  preference: ThemePreference,
-  prefersDark: boolean,
-): ResolvedTheme {
+export function resolveTheme(preference: ThemePreference, prefersDark: boolean): ResolvedTheme {
   if (preference === "system") {
     return prefersDark ? "dark" : "light";
   }

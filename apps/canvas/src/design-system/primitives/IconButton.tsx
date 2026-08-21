@@ -8,37 +8,35 @@ type IconButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children: ReactNode;
 };
 
-export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
-  function IconButton(
-    {
-      label,
-      tooltip,
-      pressed,
-      loading = false,
-      disabled,
-      children,
-      className,
-      type = "button",
-      ...rest
-    },
-    ref,
-  ) {
-    const classes = ["ds-icon-button", className].filter(Boolean).join(" ");
-
-    return (
-      <button
-        ref={ref}
-        type={type}
-        className={classes}
-        aria-label={label}
-        title={tooltip ?? label}
-        aria-pressed={pressed}
-        aria-busy={loading || undefined}
-        disabled={disabled || loading}
-        {...rest}
-      >
-        {loading ? <span className="ds-button__spinner" aria-hidden="true" /> : children}
-      </button>
-    );
+export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
+  {
+    label,
+    tooltip,
+    pressed,
+    loading = false,
+    disabled,
+    children,
+    className,
+    type = "button",
+    ...rest
   },
-);
+  ref,
+) {
+  const classes = ["ds-icon-button", className].filter(Boolean).join(" ");
+
+  return (
+    <button
+      ref={ref}
+      type={type}
+      className={classes}
+      aria-label={label}
+      title={tooltip ?? label}
+      aria-pressed={pressed}
+      aria-busy={loading || undefined}
+      disabled={disabled || loading}
+      {...rest}
+    >
+      {loading ? <span className="ds-button__spinner" aria-hidden="true" /> : children}
+    </button>
+  );
+});

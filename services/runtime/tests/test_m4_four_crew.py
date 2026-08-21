@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 
 import pytest
 
@@ -33,9 +32,7 @@ async def test_four_crew_projects_crewai_and_artifacts(data_dir):
     )
     await asyncio.sleep(1.0)
     run_id = meta["run_id"]
-    state = json.loads(
-        (persist.run_dir("ws_alpha", run_id) / "state.json").read_text()
-    )
+    state = json.loads((persist.run_dir("ws_alpha", run_id) / "state.json").read_text())
     assert state["status"] == "waiting_human"
     assert state["crew"]["framework"] == "crewai"
     assert "task_seat_pm" in state.get("crew", {}).get("process", "sequential") or True

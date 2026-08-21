@@ -42,9 +42,7 @@ export type WorkspaceCreateResult =
       ok: false;
       code: string;
       messageKey:
-        | "app.connection.unavailable"
-        | "workspace.create.failed"
-        | "workspace.create.failedDetail";
+        "app.connection.unavailable" | "workspace.create.failed" | "workspace.create.failedDetail";
     };
 
 export type DirectorySelectionResult =
@@ -75,9 +73,7 @@ export type WorkspaceGateway = {
     onResult: (result: RunnerProbeResult) => void,
     options?: GatewayOperationOptions,
   ): Promise<void>;
-  selectProjectDirectory(
-    options?: GatewayOperationOptions,
-  ): Promise<DirectorySelectionResult>;
+  selectProjectDirectory(options?: GatewayOperationOptions): Promise<DirectorySelectionResult>;
   createWorkspace(
     input: WorkspaceCreateInput,
     options?: GatewayOperationOptions,

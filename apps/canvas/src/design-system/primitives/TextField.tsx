@@ -57,9 +57,7 @@ export function TextField({
     onSubmitIntent?.();
   }
 
-  const describedBy = [hint ? hintId : null, error ? errorId : null]
-    .filter(Boolean)
-    .join(" ");
+  const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(" ");
 
   return (
     <div className={["ds-field", className].filter(Boolean).join(" ")}>

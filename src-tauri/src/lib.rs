@@ -82,14 +82,12 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while building Ensemble")
-        .run(|app_handle, event| {
-            match event {
-                tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. } => {
-                    if let Some(sup) = app_handle.try_state::<Arc<RuntimeSupervisor>>() {
-                        sup.shutdown();
-                    }
+        .run(|app_handle, event| match event {
+            tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. } => {
+                if let Some(sup) = app_handle.try_state::<Arc<RuntimeSupervisor>>() {
+                    sup.shutdown();
                 }
-                _ => {}
             }
+            _ => {}
         });
 }

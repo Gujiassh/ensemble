@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useId,
-  useRef,
-  type KeyboardEvent,
-  type ReactNode,
-} from "react";
+import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from "react";
 
 type DialogProps = {
   open: boolean;

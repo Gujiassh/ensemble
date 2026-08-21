@@ -50,9 +50,9 @@ export function CanvasViewport({
     return (
       <section className="canvas-viewport" aria-live="polite">
         <div className="canvas-viewport__state">
-            <div className="canvas-viewport__state-card">
-              <h2 className="canvas-viewport__title">{t("workspace.create.emptyTitle")}</h2>
-              {primaryAction ? (
+          <div className="canvas-viewport__state-card">
+            <h2 className="canvas-viewport__title">{t("workspace.create.emptyTitle")}</h2>
+            {primaryAction ? (
               <Button variant="primary" onClick={primaryAction.onClick}>
                 {primaryAction.label}
               </Button>

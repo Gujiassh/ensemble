@@ -52,9 +52,7 @@ async def test_reject_rework_writes_v2(data_dir):
     assert (art / "02-output.v2.md").exists()
     v2 = (art / "02-output.v2.md").read_text()
     assert "first draft" in v2
-    state = json.loads(
-        (persist.run_dir("ws_beta", run_id) / "state.json").read_text()
-    )
+    state = json.loads((persist.run_dir("ws_beta", run_id) / "state.json").read_text())
     assert state["version"] == 2
     assert state["status"] == "waiting_human"
     types = [e["type"] for e in reg.bus.history_after("ws_beta", None)]
@@ -86,9 +84,7 @@ async def test_inject_affects_rework_prompt(data_dir):
         text="ADD: prefer async",
     )
     assert "ADD: prefer async" in out["prompt"]
-    timeline = (
-        persist.run_dir("ws_beta", run_id) / "timeline.jsonl"
-    ).read_text()
+    timeline = (persist.run_dir("ws_beta", run_id) / "timeline.jsonl").read_text()
     assert "human.inject" in timeline
     assert any(
         e.get("type") == "human.inject" and "ADD: prefer async" in str(e.get("text"))
@@ -102,9 +98,7 @@ async def test_inject_affects_rework_prompt(data_dir):
         action="reject",
     )
     await asyncio.sleep(0.4)
-    v2 = (
-        persist.run_dir("ws_beta", run_id) / "artifacts" / "02-output.v2.md"
-    ).read_text()
+    v2 = (persist.run_dir("ws_beta", run_id) / "artifacts" / "02-output.v2.md").read_text()
     assert "ADD: prefer async" in v2
 
 
@@ -123,9 +117,7 @@ def test_artifact_get_and_inject_http(client):
     import time
 
     time.sleep(0.7)
-    art = client.get(
-        f"/workspaces/ws_beta/runs/{run_id}/artifacts/01-plan.md"
-    )
+    art = client.get(f"/workspaces/ws_beta/runs/{run_id}/artifacts/01-plan.md")
     assert art.status_code == 200
     assert "http plan" in art.text
     inj = client.post(
@@ -162,8 +154,6 @@ def test_http_reject_rework_v2(client):
     )
     assert rej.status_code == 200, rej.text
     time.sleep(0.5)
-    v2 = client.get(
-        f"/workspaces/ws_beta/runs/{run_id}/artifacts/02-output.v2.md"
-    )
+    v2 = client.get(f"/workspaces/ws_beta/runs/{run_id}/artifacts/02-output.v2.md")
     assert v2.status_code == 200
     assert "http rework" in v2.text

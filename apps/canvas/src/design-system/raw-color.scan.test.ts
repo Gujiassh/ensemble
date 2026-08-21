@@ -3,9 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const SRC_ROOT = path.resolve(__dirname, "..");
-const ALLOWED = new Set([
-  path.join(SRC_ROOT, "design-system/tokens/themes.ts"),
-]);
+const ALLOWED = new Set([path.join(SRC_ROOT, "design-system/tokens/themes.ts")]);
 
 const HEX = /#(?:[0-9a-fA-F]{3,8})\b/;
 const RGB = /\brgba?\(/;
@@ -19,7 +17,11 @@ function walk(dir: string): string[] {
     const stat = statSync(full);
     if (stat.isDirectory()) {
       files.push(...walk(full));
-    } else if (/\.(ts|tsx|css)$/.test(entry) && !entry.endsWith(".test.ts") && !entry.endsWith(".test.tsx")) {
+    } else if (
+      /\.(ts|tsx|css)$/.test(entry) &&
+      !entry.endsWith(".test.ts") &&
+      !entry.endsWith(".test.tsx")
+    ) {
       files.push(full);
     }
   }

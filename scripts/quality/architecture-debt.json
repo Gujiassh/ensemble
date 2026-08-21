@@ -1,0 +1,157 @@
+{
+  "version": 1,
+  "edges": [
+    {
+      "source": "apps/canvas/src/app-shell/AppShell.test.tsx",
+      "target": "apps/canvas/src/workspace/gateway.ts",
+      "owner": "Canvas app-shell integration owner",
+      "reason": "The current app-shell composition imports this workspace private module before a reviewed feature public surface exists.",
+      "publicEntryPlan": "Create and migrate to apps/canvas/src/workspace/index.ts before the next meaningful workspace feature extension.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "source": "apps/canvas/src/app-shell/AppShell.tsx",
+      "target": "apps/canvas/src/canvas/CanvasViewport.tsx",
+      "owner": "Canvas app-shell integration owner",
+      "reason": "The current app-shell composition imports this canvas private module before a reviewed feature public surface exists.",
+      "publicEntryPlan": "Create and migrate to apps/canvas/src/canvas/index.ts before the next meaningful canvas feature extension.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "source": "apps/canvas/src/app-shell/AppShell.tsx",
+      "target": "apps/canvas/src/canvas/types.ts",
+      "owner": "Canvas app-shell integration owner",
+      "reason": "The current app-shell composition imports this canvas private module before a reviewed feature public surface exists.",
+      "publicEntryPlan": "Create and migrate to apps/canvas/src/canvas/index.ts before the next meaningful canvas feature extension.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "source": "apps/canvas/src/app-shell/AppShell.tsx",
+      "target": "apps/canvas/src/inspector/InspectorShell.tsx",
+      "owner": "Canvas app-shell integration owner",
+      "reason": "The current app-shell composition imports this inspector private module before a reviewed feature public surface exists.",
+      "publicEntryPlan": "Create and migrate to apps/canvas/src/inspector/index.ts before the next meaningful inspector feature extension.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "source": "apps/canvas/src/app-shell/AppShell.tsx",
+      "target": "apps/canvas/src/preferences/usePreferences.ts",
+      "owner": "Canvas app-shell integration owner",
+      "reason": "The current app-shell composition imports this preferences private module before a reviewed feature public surface exists.",
+      "publicEntryPlan": "Create and migrate to apps/canvas/src/preferences/index.ts before the next meaningful preferences feature extension.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "source": "apps/canvas/src/app-shell/AppShell.tsx",
+      "target": "apps/canvas/src/settings/SettingsSurface.tsx",
+      "owner": "Canvas app-shell integration owner",
+      "reason": "The current app-shell composition imports this settings private module before a reviewed feature public surface exists.",
+      "publicEntryPlan": "Create and migrate to apps/canvas/src/settings/index.ts before the next meaningful settings feature extension.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "source": "apps/canvas/src/app-shell/AppShell.tsx",
+      "target": "apps/canvas/src/workspace/gateway.ts",
+      "owner": "Canvas app-shell integration owner",
+      "reason": "The current app-shell composition imports this workspace private module before a reviewed feature public surface exists.",
+      "publicEntryPlan": "Create and migrate to apps/canvas/src/workspace/index.ts before the next meaningful workspace feature extension.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "source": "apps/canvas/src/app-shell/AppShell.tsx",
+      "target": "apps/canvas/src/workspace/WorkspaceCreateFlow.tsx",
+      "owner": "Canvas app-shell integration owner",
+      "reason": "The current app-shell composition imports this workspace private module before a reviewed feature public surface exists.",
+      "publicEntryPlan": "Create and migrate to apps/canvas/src/workspace/index.ts before the next meaningful workspace feature extension.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "source": "apps/canvas/src/app-shell/ContextBar.tsx",
+      "target": "apps/canvas/src/workspace/draft.ts",
+      "owner": "Canvas app-shell integration owner",
+      "reason": "The current app-shell composition imports this workspace private module before a reviewed feature public surface exists.",
+      "publicEntryPlan": "Create and migrate to apps/canvas/src/workspace/index.ts before the next meaningful workspace feature extension.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "source": "apps/canvas/src/app-shell/ContextBar.tsx",
+      "target": "apps/canvas/src/workspace/gateway.ts",
+      "owner": "Canvas app-shell integration owner",
+      "reason": "The current app-shell composition imports this workspace private module before a reviewed feature public surface exists.",
+      "publicEntryPlan": "Create and migrate to apps/canvas/src/workspace/index.ts before the next meaningful workspace feature extension.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "source": "apps/canvas/src/app-shell/rootState.ts",
+      "target": "apps/canvas/src/preferences/schema.ts",
+      "owner": "Canvas app-shell integration owner",
+      "reason": "The current app-shell composition imports this preferences private module before a reviewed feature public surface exists.",
+      "publicEntryPlan": "Create and migrate to apps/canvas/src/preferences/index.ts before the next meaningful preferences feature extension.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "source": "apps/canvas/src/app-shell/rootState.ts",
+      "target": "apps/canvas/src/workspace/gateway.ts",
+      "owner": "Canvas app-shell integration owner",
+      "reason": "The current app-shell composition imports this workspace private module before a reviewed feature public surface exists.",
+      "publicEntryPlan": "Create and migrate to apps/canvas/src/workspace/index.ts before the next meaningful workspace feature extension.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "source": "apps/canvas/src/app-shell/useRootLifecycle.ts",
+      "target": "apps/canvas/src/preferences/schema.ts",
+      "owner": "Canvas app-shell integration owner",
+      "reason": "The current app-shell composition imports this preferences private module before a reviewed feature public surface exists.",
+      "publicEntryPlan": "Create and migrate to apps/canvas/src/preferences/index.ts before the next meaningful preferences feature extension.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "source": "apps/canvas/src/app-shell/useRootLifecycle.ts",
+      "target": "apps/canvas/src/workspace/gateway.ts",
+      "owner": "Canvas app-shell integration owner",
+      "reason": "The current app-shell composition imports this workspace private module before a reviewed feature public surface exists.",
+      "publicEntryPlan": "Create and migrate to apps/canvas/src/workspace/index.ts before the next meaningful workspace feature extension.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "source": "apps/canvas/src/inspector/InspectorShell.tsx",
+      "target": "apps/canvas/src/canvas/types.ts",
+      "owner": "Canvas inspector integration owner",
+      "reason": "The current inspector composition imports this canvas private module before a reviewed feature public surface exists.",
+      "publicEntryPlan": "Create and migrate to apps/canvas/src/canvas/index.ts before the next meaningful canvas feature extension.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "source": "apps/canvas/src/settings/SettingsSurface.tsx",
+      "target": "apps/canvas/src/preferences/schema.ts",
+      "owner": "Canvas settings integration owner",
+      "reason": "The current settings composition imports this preferences private module before a reviewed feature public surface exists.",
+      "publicEntryPlan": "Create and migrate to apps/canvas/src/preferences/index.ts before the next meaningful preferences feature extension.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "source": "apps/canvas/src/settings/SettingsSurface.tsx",
+      "target": "apps/canvas/src/preferences/usePreferences.ts",
+      "owner": "Canvas settings integration owner",
+      "reason": "The current settings composition imports this preferences private module before a reviewed feature public surface exists.",
+      "publicEntryPlan": "Create and migrate to apps/canvas/src/preferences/index.ts before the next meaningful preferences feature extension.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "source": "apps/canvas/src/workspace/draft.ts",
+      "target": "apps/canvas/src/preferences/schema.ts",
+      "owner": "Canvas workspace integration owner",
+      "reason": "The current workspace composition imports this preferences private module before a reviewed feature public surface exists.",
+      "publicEntryPlan": "Create and migrate to apps/canvas/src/preferences/index.ts before the next meaningful preferences feature extension.",
+      "reviewBy": "2026-12-31"
+    },
+    {
+      "source": "apps/canvas/src/workspace/WorkspaceCreateFlow.tsx",
+      "target": "apps/canvas/src/preferences/schema.ts",
+      "owner": "Canvas workspace integration owner",
+      "reason": "The current workspace composition imports this preferences private module before a reviewed feature public surface exists.",
+      "publicEntryPlan": "Create and migrate to apps/canvas/src/preferences/index.ts before the next meaningful preferences feature extension.",
+      "reviewBy": "2026-12-31"
+    }
+  ]
+}

@@ -10,7 +10,6 @@ from typing import Any
 from ensemble_runtime.org.seed import all_seeds
 from ensemble_runtime.run.bus import EventBus
 
-
 FOUR_STEPS = [
     ("seat_pm", "working", "e_pm_res", "seat_pm", "seat_res", "brief"),
     ("seat_res", "working", "e_res_eng", "seat_res", "seat_eng", "research"),
@@ -110,9 +109,7 @@ class Registry:
                 )
             )
         else:
-            self._tasks[run_id] = asyncio.create_task(
-                self._play_single(workspace_id, run_id)
-            )
+            self._tasks[run_id] = asyncio.create_task(self._play_single(workspace_id, run_id))
         return meta
 
     async def _play_four(self, workspace_id: str, run_id: str) -> None:
@@ -260,8 +257,9 @@ class Registry:
                     "status": "passed",
                 },
             )
-            from ensemble_runtime.persist import store as persist
             import json
+
+            from ensemble_runtime.persist import store as persist
 
             version = 1
             state_path = persist.run_dir(workspace_id, run_id) / "state.json"
@@ -349,7 +347,6 @@ class Registry:
             },
         )
         return {"ok": True, "event": ev, "prompt": self.runs[run_id]["prompt"]}
-
 
     def _bubble_seat(self, workspace_id: str, bubble_id: str) -> str:
         for ev in reversed(self.bus.history_after(workspace_id, None)):

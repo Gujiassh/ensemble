@@ -6,7 +6,6 @@ import copy
 
 from ensemble_runtime.crew import CrewAIMode, project_org_to_crew
 
-
 SAMPLE_TREE = {
     "root": {
         "id": "group_default",
