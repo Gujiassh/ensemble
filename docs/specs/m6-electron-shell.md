@@ -1,9 +1,9 @@
 # M6 Electron Shell and Rust Runtime Boundary
 
-**状态**：CURRENT · CRITICAL-REVIEWED ACCEPT DOCUMENTATION BASELINE · F0-A1 IMPLEMENTATION CRITICAL REVIEW ACCEPT/AWAITING OWNER ACCEPTANCE · F0-A2/F0-A3/F1 IMPLEMENTATION PAUSED（2026-08-21）
+**状态**：CURRENT · CRITICAL-REVIEWED ACCEPT DOCUMENTATION BASELINE · F0-A1 OWNER ACCEPTED · F0-A2 AUTHORIZED NEXT · LATER PHASES GATED（2026-08-21）
 **风险等级**：Critical
 **审查**：[M6 Electron Shell Architecture Critical Review](reviews/M6-electron-shell-architecture-review-2026-08-21.md) · **ACCEPT** · 当前Shell/security/transport/ownership唯一Critical ACCEPT · 仅限文档范围
-**阶段**：F0-A1 已单独获授权并实现，独立 Critical 实现审查已 ACCEPT，当前等待产品负责人验收且尚未 owner-accepted；F0-A2 Electron Supervisor/Security Bridge 与后续 F0-A3 仍暂停且未获授权，owner 验收后仍需单独明确授权
+**阶段**：F0-A1 独立 Critical 实现审查与产品负责人验收均 ACCEPT，已 OWNER ACCEPTED；F0-A2 Electron Supervisor/Security Bridge 已授权为下一阶段，在 acceptance/delivery 状态提交推送后启动；F0-A3 及后续阶段仍须先关闭前序技术/审查/交付门禁
 **依赖**：[m6-architecture.md](m6-architecture.md) · [f0-a-runtime-lifecycle.md](f0-a-runtime-lifecycle.md) · [m6-local-runtime-scheduling.md](m6-local-runtime-scheduling.md) · [m6-platform-packaging.md](m6-platform-packaging.md) · [m6-events-commands.md](m6-events-commands.md) · [m6-execution-workspace-security.md](m6-execution-workspace-security.md) · [../ssot/platform-adaptation.md](../ssot/platform-adaptation.md)
 
 ## 1. 背景、目标与不变范围

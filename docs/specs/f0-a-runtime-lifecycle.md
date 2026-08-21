@@ -2,8 +2,8 @@
 
 **Date**: 2026-08-20
 **Risk class**: Critical
-**Overall status**: F0-A1 IMPLEMENTATION CRITICAL REVIEW ACCEPT · AWAITING OWNER ACCEPTANCE
-**Current slice**: F0-A1 Rust Runtime Bootstrap implemented on WSL/Linux; independent Critical implementation verdict ACCEPT; owner acceptance PENDING; F0-A1 is not owner-accepted and F0-A2 is not authorized
+**Overall status**: F0-A1 OWNER ACCEPTED / ACCEPTED · F0-A2 AUTHORIZED NEXT AFTER DELIVERY PUSH
+**Current slice**: F0-A1 Rust Runtime Bootstrap implementation and owner verdicts ACCEPT; F0-A1 is OWNER ACCEPTED; F0-A2 is authorized to start after the acceptance/delivery status commit is pushed
 
 ## 1. Purpose
 
@@ -21,8 +21,8 @@ Engineering completion is not owner acceptance. A later slice must not silently 
 
 | Slice | Deliverable | Status | Start condition |
 |---|---|---|---|
-| F0-A1 | Independent Rust Runtime bootstrap, authenticated loopback health, canonical data-root ownership, and datastore lock | IMPLEMENTATION CRITICAL REVIEW ACCEPT · AWAITING OWNER ACCEPTANCE | Product owner acceptance; later slices still require separate authorization |
-| F0-A2 | Electron Supervisor/Security Bridge: Security-owned BrowserWindow/external confirm, closed activation, Workspace-create commandId/selection binding, exact byte-credit streams, and signed sidecar | PENDING | Owner accepts F0-A1 and explicitly authorizes F0-A2 |
+| F0-A1 | Independent Rust Runtime bootstrap, authenticated loopback health, canonical data-root ownership, and datastore lock | OWNER ACCEPTED / ACCEPTED | Closed |
+| F0-A2 | Electron Supervisor/Security Bridge: Security-owned BrowserWindow/external confirm, closed activation, Workspace-create commandId/selection binding, exact byte-credit streams, and signed sidecar | AUTHORIZED NEXT | Acceptance/delivery status commit pushed; own technical/review gates remain mandatory |
 | F0-A3 | Windows/macOS/Linux Electron+Runtime lifecycle, final-binary fuse readback, signing/update/uninstall, closed activation/log proof, and installed-app IME/a11y matrix | PENDING | Owner accepts F0-A2 |
 
 Windows, macOS, and Linux Electron lifecycle evidence belongs to F0-A3. It does not change any F0-A1 Runtime contract or authorize F0-A1 implementation.
@@ -145,6 +145,6 @@ Current implementation evidence:
 - sanitized record: [F0-A1 WSL/Linux implementation evidence](evidence/f0-a1/wsl-linux-2026-08-21.md)
 - enforceable bootstrap contract and owner runbook: [Rust Runtime Bootstrap SSoT](../ssot/runtime-bootstrap.md)
 - independent Critical review: [**ACCEPT**](reviews/F0-A1-runtime-implementation-review-2026-08-21.md)
-- owner acceptance: **PENDING**; F0-A1 is not owner-accepted
+- owner acceptance: [**ACCEPT**](reviews/F0-A1-owner-acceptance-2026-08-21.md); F0-A1 is OWNER ACCEPTED
 
-Independent implementation ACCEPT does not start F0-A2 or close Windows/macOS platform proof. F0-A2 remains forbidden until owner acceptance and a separate explicit authorization.
+Owner acceptance authorizes F0-A2 as the next phase after this acceptance/delivery status commit is pushed. Windows/macOS platform proof and every later technical/review/quality gate remain mandatory.

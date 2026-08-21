@@ -1,12 +1,12 @@
 # Code Quality And Maintainability SSoT
 
-**Status:** active current-code quality/CI contract, F0-A1 implementation Critical review ACCEPT awaiting owner acceptance, Electron documentation architecture ACCEPT, executable transition gates pending (2026-08-21)
+**Status:** active current-code quality/CI contract, F0-A1 OWNER ACCEPTED; F0-A2 authorized next after delivery push, Electron documentation architecture ACCEPT, executable transition gates pending (2026-08-21)
 
 ## Scope And Phase Boundary
 
 **Independent acceptance evidence:** [Code Quality Gates Critical/Standard Review (2026-08-21)](../specs/reviews/Code-quality-gates-review-2026-08-21.md) is **ACCEPT** for current quality tooling/governance. [M6 Electron Shell Architecture Critical Review](../specs/reviews/M6-electron-shell-architecture-review-2026-08-21.md) is **ACCEPT** and is the sole current Shell/security/transport/ownership Critical acceptance, but documentation-only. Neither review authorizes F0/F1 implementation, persistence changes, package work, commit, push, merge, deployment, or release.
 
-Ensemble current-code quality gates remain active. Separate explicit owner authorization enabled only the F0-A1 Rust Runtime Bootstrap implementation; it is implemented with WSL/Linux evidence and its [independent Critical implementation review](../specs/reviews/F0-A1-runtime-implementation-review-2026-08-21.md) is **ACCEPT**. Delivery now awaits owner acceptance, which is **PENDING**; F0-A1 is not owner-accepted. F0-A2, F0-A3, F1, and product implementation remain paused and require separate explicit authorization after owner acceptance. Electron is the accepted target production Shell documentation architecture, but Electron source, manifests, package configuration, executable gates and three-platform evidence do not exist yet. Current CI still checks executable legacy Tauri/Python paths until the conjunctive code cutover condition is implemented and accepted; documentation ACCEPT does not make any Electron executable gate green.
+Ensemble current-code quality gates remain active. Separate explicit owner authorization enabled only the F0-A1 Rust Runtime Bootstrap implementation; it is implemented with WSL/Linux evidence and its [independent Critical implementation review](../specs/reviews/F0-A1-runtime-implementation-review-2026-08-21.md) is **ACCEPT**. [Owner acceptance](../specs/reviews/F0-A1-owner-acceptance-2026-08-21.md) is **ACCEPT** and F0-A1 is OWNER ACCEPTED. F0-A2 is authorized next after the acceptance/delivery status commit is pushed. F0-A3, F1, and product phases remain gated by their required technical, evidence, quality, independent-review, and delivery conditions; standing authorization waives none of them. Electron is the accepted target production Shell documentation architecture, but Electron source, manifests, package configuration, executable gates and three-platform evidence do not exist yet. Current CI still checks executable legacy Tauri/Python paths until the conjunctive code cutover condition is implemented and accepted; documentation ACCEPT does not make any Electron executable gate green.
 
 File size is one signal, not an architecture. The binding standard is coherent responsibility, explicit contracts, one-way dependencies, testability, and reproducible local/CI evidence.
 
@@ -177,17 +177,17 @@ GitHub Actions installs the pinned toolchains and runs only the same `pnpm quali
 Verified on the current Linux environment:
 
 - Self-tests: **53** total, comprising 42 Node adversarial tests and 11 Python unittest cases.
-- Repository hygiene: **264 files / 250 text files**, zero errors.
+- Repository hygiene: **265 files / 251 text files**, zero errors.
 - Config/workflow validation: zero errors; immutable actions and pinned tools confirmed.
 - Source shape: **147 files**, 1 trusted/provenance-generated file, **7 reviewed soft warnings**, 0 hard errors, 0 hard exceptions.
 - TypeScript graph: **68 files / 144 edges**, 19 bounded debt edges, zero errors.
 - Python graph: **29 files / 45 edges**, including service and Runner tests, zero errors.
 - Rust direction: 0 active layered files, explicitly N/A; ten crate/self/super adversarial tests pass.
-- Markdown: **71 authored files / 437 local links**, zero missing (`pnpm quality:links`, 2026-08-21 F0-A1 implementation evidence).
+- Markdown: **72 authored files / 453 local links**, zero missing (`pnpm quality:links`, 2026-08-21 F0-A1 implementation evidence).
 - Frontend formatter: **69 files**, four exact frozen preview debts, zero unlisted differences.
 - Canvas: zero-warning lint, strict typecheck, **42/42 tests**, production build passed.
 - Python Runtime/Runners: Ruff/format passed; **28/28 tests** passed.
-- Rust Runtime F0-A1: fmt/production+all-target Clippy passed; **28/28 tests** passed (10 unit, 16 black-box process integration, 2 in-process owned-server integration); sanitized WSL/Linux smoke passed. See [Rust Runtime Bootstrap](runtime-bootstrap.md) and [F0-A1 evidence](../specs/evidence/f0-a1/wsl-linux-2026-08-21.md). Independent Critical implementation review is ACCEPT; owner acceptance remains PENDING and F0-A1 is not owner-accepted.
+- Rust Runtime F0-A1: fmt/production+all-target Clippy passed; **28/28 tests** passed (10 unit, 16 black-box process integration, 2 in-process owned-server integration); sanitized WSL/Linux smoke passed. See [Rust Runtime Bootstrap](runtime-bootstrap.md) and [F0-A1 evidence](../specs/evidence/f0-a1/wsl-linux-2026-08-21.md). Independent Critical implementation review and owner acceptance are ACCEPT; F0-A1 is OWNER ACCEPTED. F0-A2 is next after delivery push and retains all its own gates.
 - Legacy current-code Tauri: frontend prerequisite, fmt/Clippy passed; **4/4 tests** passed. This is transition evidence only, not Electron acceptance.
 - Electron documentation architecture: **ACCEPT**. Electron executable implementation/gates: **not implemented and not green**; security/package and three-platform evidence remain pending.
 

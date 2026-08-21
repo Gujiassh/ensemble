@@ -12,7 +12,8 @@ This directory is the aggregation root for Ensemble's current, enforceable invar
 ## Independent Acceptance Evidence
 
 - [Code Quality Gates Critical/Standard Review (2026-08-21)](../specs/reviews/Code-quality-gates-review-2026-08-21.md): **ACCEPT** for the current quality tooling, governance, bounded review/debt ledgers, and CI contract only. It does not authorize F0, F0-A1, Electron implementation, product behavior, persistence changes, commit, push, merge, deployment, or release.
-- [F0-A1 Runtime Implementation Critical Review (2026-08-21)](../specs/reviews/F0-A1-runtime-implementation-review-2026-08-21.md): **ACCEPT** for the F0-A1 Linux/WSL implementation only; delivery is **AWAITING OWNER ACCEPTANCE**, owner acceptance is **PENDING**, and F0-A2 remains forbidden without later explicit authorization.
+- [F0-A1 Runtime Implementation Critical Review (2026-08-21)](../specs/reviews/F0-A1-runtime-implementation-review-2026-08-21.md): **ACCEPT** for the F0-A1 Linux/WSL implementation.
+- [F0-A1 Owner Acceptance (2026-08-21)](../specs/reviews/F0-A1-owner-acceptance-2026-08-21.md): **OWNER ACCEPT / F0-A1 ACCEPTED**; F0-A2 is authorized next after the acceptance/delivery status commit is pushed, with all later gates still mandatory.
 
 ## Current Domains
 

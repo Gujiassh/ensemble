@@ -1,6 +1,6 @@
 # Ensemble Engineering Rules
 
-These rules govern implementation and review; they do not themselves authorize a phase, product behavior, persistence contract, or platform migration. The owner separately authorized only F0-A1 Rust Runtime Bootstrap. F0-A1 implementation has independent Critical review ACCEPT and now awaits explicit owner acceptance; it is not owner-accepted. F0-A2, F0-A3, F1, and product implementation remain paused and require separate explicit authorization after owner acceptance. The Electron direction remains documentation-only until its owning phase is explicitly authorized.
+These rules govern implementation and review; they do not themselves authorize a phase, product behavior, persistence contract, or platform migration. The owner separately authorized only F0-A1 Rust Runtime Bootstrap. F0-A1 is independently reviewed and owner-accepted. F0-A2 is the authorized next phase and may start after the owner-acceptance/delivery status commit is pushed. Standing owner authorization permits later phases only after each required technical, evidence, quality, review, and delivery gate closes; no gate is waived or skipped. The Electron direction remains documentation-only until its owning phase is explicitly authorized.
 
 ## Sources Of Truth
 

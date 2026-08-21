@@ -1,6 +1,6 @@
 # Ensemble 总览
 
-**状态**：V2产品与Electron Shell文档基线（2026-08-21）· F0-A1实现Critical审查ACCEPT并等待产品负责人验收 · 产品实现暂停
+**状态**：V2产品与Electron Shell文档基线（2026-08-21）· F0-A1 OWNER ACCEPTED · F0-A2为下一授权阶段 · 产品阶段仍受门禁约束
 
 ## 产品定位
 
@@ -64,7 +64,7 @@ Electron Main/Preload 只承担窗口、平台能力、安全边界、Runtime si
 
 ## 当前代码定位
 
-M0-M5 原型验证过部分功能概念，但其前端、Backend、协议和持久化都不是 V2 兼容约束。当前工作树仍含旧壳、Python Runtime 和既有 F1-A 代码；在 Electron 实现获得阶段授权并通过迁移门禁前，它们仍接受现有质量检查，但不代表目标生产架构已经实现。产品负责人已单独授权且仅授权 F0-A1 Rust Runtime Bootstrap；该切片已实现并通过独立 Critical 实现审查，当前等待产品负责人明确验收，尚未 owner-accepted。
+M0-M5 原型验证过部分功能概念，但其前端、Backend、协议和持久化都不是 V2 兼容约束。当前工作树仍含旧壳、Python Runtime 和既有 F1-A 代码；在 Electron 实现获得阶段授权并通过迁移门禁前，它们仍接受现有质量检查，但不代表目标生产架构已经实现。产品负责人已单独授权且仅授权 F0-A1 Rust Runtime Bootstrap；该切片已实现、通过独立 Critical 实现审查并获产品负责人明确 ACCEPT；F0-A1 已 owner-accepted。
 
 允许：
 
@@ -105,4 +105,4 @@ M0-M5 原型验证过部分功能概念，但其前端、Backend、协议和持�
 20. [specs/f1-shell-design-system.md](specs/f1-shell-design-system.md)
 21. [12-dev-plan.md](12-dev-plan.md)
 
-`03`、`06`、`09`、`10`、`11`、`13`和M1-M5 Specs只保留历史参考。[M6 Electron Shell Architecture Critical Review](specs/reviews/M6-electron-shell-architecture-review-2026-08-21.md)已**ACCEPT**，是当前Shell/security/transport/ownership唯一Critical ACCEPT，但仅接受文档架构；该 review 本身不授权任何实现。产品负责人随后单独授权且仅授权 F0-A1；其 Rust Runtime Bootstrap 已通过[独立 Critical 实现审查](specs/reviews/F0-A1-runtime-implementation-review-2026-08-21.md)，当前等待产品负责人明确验收，尚未 owner-accepted。Electron代码、package与三平台证据仍不存在，F0-A2、F0-A3、F1和全部产品实现继续暂停，并且只有 owner 验收后再次明确授权才能启动。旧M6 interaction final review仍仅证明未变化Domain/save/interaction合同。
+`03`、`06`、`09`、`10`、`11`、`13`和M1-M5 Specs只保留历史参考。[M6 Electron Shell Architecture Critical Review](specs/reviews/M6-electron-shell-architecture-review-2026-08-21.md)已**ACCEPT**，是当前Shell/security/transport/ownership唯一Critical ACCEPT，但仅接受文档架构；该 review 本身不授权任何实现。产品负责人随后单独授权且仅授权 F0-A1；其 Rust Runtime Bootstrap 已通过[独立 Critical 实现审查](specs/reviews/F0-A1-runtime-implementation-review-2026-08-21.md)并获[Owner ACCEPT](specs/reviews/F0-A1-owner-acceptance-2026-08-21.md)。F0-A2 是 acceptance/delivery 状态提交推送后的下一授权阶段；Electron代码、package与三平台证据仍不存在。F0-A3、F1和产品阶段只在前序技术/审查/质量/交付门禁关闭后按 standing authorization 继续，不得跳过门禁。旧M6 interaction final review仍仅证明未变化Domain/save/interaction合同。

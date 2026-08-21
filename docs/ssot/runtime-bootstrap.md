@@ -1,6 +1,6 @@
 # Rust Runtime Bootstrap
 
-**Status:** F0-A1 Linux/WSL implementation Critical review ACCEPT; awaiting owner acceptance; owner acceptance PENDING; not owner-accepted (2026-08-21)
+**Status:** F0-A1 Linux/WSL OWNER ACCEPTED / ACCEPTED; F0-A2 authorized next after acceptance/delivery status commit push (2026-08-21)
 
 This document is the current source of truth for the standalone Rust Runtime bootstrap. It covers only process ownership, authenticated loopback health, ready publication, and graceful process shutdown. Electron supervision, Domain/Event persistence, Runner behavior, PTY ownership, and product workflows remain outside F0-A1.
 
@@ -201,4 +201,4 @@ Delete the temporary directory after inspection with the workspace's preferred r
 
 ## Current Evidence And Gaps
 
-The sanitized WSL/Linux record is [F0-A1 WSL/Linux evidence](../specs/evidence/f0-a1/wsl-linux-2026-08-21.md). The [independent Critical implementation review](../specs/reviews/F0-A1-runtime-implementation-review-2026-08-21.md) is **ACCEPT**; delivery is **AWAITING OWNER ACCEPTANCE**, owner acceptance is **PENDING**, and F0-A1 is not owner-accepted. This is not three-platform closure and does not authorize F0-A2. Windows Ctrl-C/termination, macOS signals, platform filesystems, packaged sidecar resolution, signing, and Electron supervision remain unverified and must not be inferred from Linux results. Hard-crash cleanup of a temporary ready file left during the atomic-publication window is not exercised and remains outside this graceful-shutdown slice; no scavenging behavior is claimed.
+The sanitized WSL/Linux record is [F0-A1 WSL/Linux evidence](../specs/evidence/f0-a1/wsl-linux-2026-08-21.md). The [independent Critical implementation review](../specs/reviews/F0-A1-runtime-implementation-review-2026-08-21.md) and [Owner Acceptance](../specs/reviews/F0-A1-owner-acceptance-2026-08-21.md) are **ACCEPT**; F0-A1 is OWNER ACCEPTED. This is not three-platform closure. F0-A2 is authorized to start after the acceptance/delivery status commit is pushed, and every later gate remains mandatory. Windows Ctrl-C/termination, macOS signals, platform filesystems, packaged sidecar resolution, signing, and Electron supervision remain unverified and must not be inferred from Linux results. Hard-crash cleanup of a temporary ready file left during the atomic-publication window is not exercised and remains outside this graceful-shutdown slice; no scavenging behavior is claimed.
