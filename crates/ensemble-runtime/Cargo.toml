@@ -1,0 +1,28 @@
+[package]
+name = "ensemble-runtime"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Authenticated local runtime bootstrap for Ensemble"
+publish = false
+
+[dependencies]
+axum = "0.8"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+clap = { version = "4.5", features = ["derive"] }
+dunce = "1.0"
+fs2 = "0.4"
+hex = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+subtle = "2.6"
+tempfile = "3.20"
+thiserror = "2.0"
+tokio = { version = "1.47", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+
+[target.'cfg(unix)'.dev-dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3.20"
