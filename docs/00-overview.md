@@ -1,6 +1,6 @@
 # Ensemble 总览
 
-**状态**：V2 产品重建基线（2026-08-19）
+**状态**：V2产品与Electron Shell文档基线（2026-08-21）· Critical ACCEPT · 产品实现暂停
 
 ## 产品定位
 
@@ -31,7 +31,7 @@ Ensemble 是一款跨平台、本地优先的 Agent 编排桌面应用。
 
 首版包含：
 
-- Windows、macOS、Linux 桌面端
+- Windows、macOS、Linux Electron 桌面端
 - 本地 Workspace 和 Run
 - 可替换 Runner
 - 单 Agent、多 Agent 和嵌套组织
@@ -48,16 +48,30 @@ Ensemble 是一款跨平台、本地优先的 Agent 编排桌面应用。
 - 企业多租户
 - Runner 插件市场
 
+## 目标生产架构
+
+```text
+Electron Main/Preload shell
+  -> React Canvas Renderer
+  -> authenticated proxy
+  -> Rust Runtime sidecar
+  -> user-installed Runner CLI
+```
+
+Electron Main/Preload 只承担窗口、平台能力、安全边界、Runtime sidecar 监督和 typed transport。Rust Runtime 继续唯一拥有 Domain、Command、Event、SQLite、queue、schedule、permission、Runner、PTY/ConPTY、进程树和 safe quit。Renderer 不获得 Node、Runtime token/port/PID/ready path 或结构化原始绝对路径。
+
+生产只保留一个 Electron 壳，不建设双壳兼容路线。旧壳和 Python/Tauri 产物属于历史实现或迁移期当前代码，不是目标架构，也不能作为 Electron 安全、transport 或 owner 的授权证据。
+
 ## 当前代码定位
 
-M0–M5 原型验证过部分功能概念，但其前端、Backend、协议和持久化都不是 V2 兼容约束。
+M0-M5 原型验证过部分功能概念，但其前端、Backend、协议和持久化都不是 V2 兼容约束。当前工作树仍含旧壳、Python Runtime 和既有 F1-A 代码；在 Electron 实现获得阶段授权并通过迁移门禁前，它们仍接受现有质量检查，但不代表目标生产架构已经实现。
 
 允许：
 
 - 删除并重写现有前端
 - 删除并重写现有 Backend
-- 重新选择技术方案
-- 重做数据模型和通信协议
+- 按直接目标移除旧生产壳
+- 重做数据模型和通信协议，但必须先获得对应合同变更批准
 
 要求：
 
@@ -65,6 +79,7 @@ M0–M5 原型验证过部分功能概念，但其前端、Backend、协议和�
 - 不为旧演示数据增加兼容层
 - 三个平台必须以真实安装包验收
 - 主题、语言和平台差异不能侵入业务组件
+- Shell 迁移不能改变 Runtime API、持久化字段或 save meaning
 
 ## 当前真源
 
@@ -78,13 +93,16 @@ M0–M5 原型验证过部分功能概念，但其前端、Backend、协议和�
 8. [specs/m6-orchestration-interaction.md](specs/m6-orchestration-interaction.md)
 9. [specs/m6-run-operations.md](specs/m6-run-operations.md)
 10. [specs/m6-architecture.md](specs/m6-architecture.md)
-11. [specs/m6-agent-session-collaboration.md](specs/m6-agent-session-collaboration.md)
-12. [specs/m6-execution-workspace-security.md](specs/m6-execution-workspace-security.md)
-13. [specs/workspace-output-inspection.md](specs/workspace-output-inspection.md)
-14. [specs/m6-runner-adapter.md](specs/m6-runner-adapter.md)
-15. [specs/m6-events-commands.md](specs/m6-events-commands.md)
-16. [specs/m6-platform-packaging.md](specs/m6-platform-packaging.md)
-17. [specs/m6-local-runtime-scheduling.md](specs/m6-local-runtime-scheduling.md)
-18. [12-dev-plan.md](12-dev-plan.md)
+11. [specs/m6-electron-shell.md](specs/m6-electron-shell.md)
+12. [specs/m6-agent-session-collaboration.md](specs/m6-agent-session-collaboration.md)
+13. [specs/m6-execution-workspace-security.md](specs/m6-execution-workspace-security.md)
+14. [specs/workspace-output-inspection.md](specs/workspace-output-inspection.md)
+15. [specs/m6-runner-adapter.md](specs/m6-runner-adapter.md)
+16. [specs/m6-events-commands.md](specs/m6-events-commands.md)
+17. [specs/m6-platform-packaging.md](specs/m6-platform-packaging.md)
+18. [specs/m6-local-runtime-scheduling.md](specs/m6-local-runtime-scheduling.md)
+19. [specs/m6-interaction-implementation-slices.md](specs/m6-interaction-implementation-slices.md)
+20. [specs/f1-shell-design-system.md](specs/f1-shell-design-system.md)
+21. [12-dev-plan.md](12-dev-plan.md)
 
-`03`、`06`、`09`、`10`、`11` 和 M1–M5 Specs 只保留为历史参考；V2 实施以以上产品、架构、协议、平台和开发计划为准。
+`03`、`06`、`09`、`10`、`11`、`13`和M1-M5 Specs只保留历史参考。[M6 Electron Shell Architecture Critical Review](specs/reviews/M6-electron-shell-architecture-review-2026-08-21.md)已**ACCEPT**，是当前Shell/security/transport/ownership唯一Critical ACCEPT，但仅接受文档架构；Electron代码、package与三平台证据仍不存在，F0/F1实现继续暂停。旧M6 interaction final review仍仅证明未变化Domain/save/interaction合同。

@@ -9,7 +9,7 @@
 - 首版只控制当前设备，不提供远程 Runtime、账户、云中继或跨设备访问。
 - 关闭主窗口会收起到系统托盘；Runtime、活动 Run、持久化队列和定时计划继续工作。
 - 首版不安装系统级服务。显式退出、用户注销或系统关机都会停止 Runtime；Ensemble 默认随用户登录启动，用户可以关闭该设备偏好。
-- 显式退出时默认执行“安全暂停并退出”；只有 Runtime 确认 Run 已安全暂停后才关闭该 Run 的自动恢复，不把 Runtime 留在桌面应用之外运行。
+- 显式退出时默认执行“安全暂停并退出”；只有 Runtime 确认 Run 已安全暂停后才关闭该 Run 的自动恢复，不把 Runtime 留在桌面应用之外运行。无论是否存在 active Run，Runtime 还必须先 fence 新 command admission并把全部 already-accepted Draft command 收敛到 canonical applied/rejected/conflict；否则不返回安全退出确认。
 - 注销、关机或异常退出后，原本运行中的 Run 在下次登录时自动进入风险感知恢复。无法证明幂等或副作用状态不明的操作等待用户处理。
 - 后台可以继续已有 Run，也可以启动持久化队列和定时计划；首版不做文件监听、Webhook 或通用外部触发器。
 - 后台操作只能使用计划显式预授权的权限。超出范围时暂停相关工作并创建 Attention，不自动扩大授权。
@@ -19,7 +19,7 @@
 | 用户动作 | Runtime 行为 |
 |---|---|
 | 关闭窗口 | 隐藏到托盘，继续运行 |
-| 托盘中退出 | Runtime 先安全暂停并收敛 Runner；durable acknowledgement 后 Shell 只结束 Runtime sidecar 和自身进程树 |
+| 托盘中退出 | Runtime先安全暂停并收敛Runner；durable acknowledgement后Electron Main只结束owned Rust sidecar和Electron自身进程，Runner已由Runtime确认收敛 |
 
 首版托盘只提供打开应用和退出。暂停属于具体 Run 操作；首版不引入设备级 **Pause all / Resume all** 状态、命令或事件。
 
@@ -28,13 +28,17 @@
 首版选择以下生产边界：
 
 ```text
-Tauri desktop process
-  window / tray / autostart / OS notifications / platform capabilities
+React Canvas Renderer
+       |
+       | frozen Preload allowlist + MessagePort
+       v
+Electron Main/Preload
+  window / tray / autostart / OS notifications / security / platform capabilities
        |
        | authenticated loopback transport
        v
 ensemble-runtime sidecar (Rust)
-  commands / scheduler / event ledger / recovery / adapter registry
+  Domain / Command / Event / SQLite / scheduler / recovery / adapter registry
        |
        +-- built-in pi adapter --------> user-installed pi CLI
        +-- built-in Codex adapter -----> user-installed Codex CLI
@@ -43,60 +47,66 @@ ensemble-runtime sidecar (Rust)
 
 边界规则：
 
-- Runtime 是随安装包交付、单独签名的 Rust sidecar，不要求系统 Python、Node 或仓库依赖。
-- Tauri 进程是 supervisor。关闭 Webview 不停止 supervisor；显式退出才进入 Runtime shutdown。
-- Adapter 实现随 Runtime 交付并通过编译期 registry 注册。首版不加载第三方二进制或本地 Adapter 目录。
-- Runner CLI 是用户安装的外部进程。Runtime 通过 PTY/ConPTY 启动并持有进程树，不通过 Shell 脚本拼接业务协议。
-- Runtime、Adapter 和 Runner 分层仍以逻辑接口隔离。内置 Adapter 不允许直接写 Domain State。
-- Runtime 崩溃不得让 Runner 变成无主进程。Runner 需要父进程监督、进程组或 Job Object，以及 Runtime lease 丢失后的回收路径。
+- 生产只保留一个Electron Shell，不维护旧壳/Electron双生产兼容路线。
+- Runtime是随安装包交付、单独签名的Rust sidecar，不要求系统Python、Node或仓库依赖。Node只属于Electron Shell，不形成业务Runtime。
+- Electron Main/Preload只负责窗口、平台能力、安全边界、签名sidecar监督和typed transport；不拥有Domain、SQLite、Runner、PTY/ConPTY、queue、schedule或safe quit。
+- Adapter实现随Runtime交付并通过编译期registry注册。首版不加载第三方二进制或本地Adapter目录。
+- Runner CLI是用户安装的外部进程。Rust Runtime通过PTY/ConPTY启动并持有进程树，不通过Main或Shell脚本拼接业务协议。
+- Runtime、Adapter和Runner分层仍以逻辑接口隔离。内置Adapter不允许直接写Domain State。
+- Runtime崩溃不得让Runner变成无主进程。Runner需要由Rust Runtime建立父进程监督、进程组或Job Object，以及Runtime lease丢失后的回收路径。Main不枚举、kill或重分类Runner child。
 
-选择 sidecar 而不把业务 Runtime 放进 Tauri 进程，原因是 Runner 进程管理、事件恢复和调度需要独立故障边界。它不是常驻系统服务，也不意味着首版支持远程连接。
+选择sidecar而不把业务Runtime放进Electron Main，原因是Runner进程管理、事件恢复和调度需要独立故障边界，并且Node壳不能形成第二状态源。sidecar不是常驻系统服务，也不意味着首版支持远程连接。既有Python/旧壳supervisor是历史实现漂移，不是待翻译模板。
 
-### 2.1 每个 data root 的单实例所有权
+### 2.1 单实例与data root所有权
 
-首版不做 Runtime leader election。同一 canonical app-data root 在任一时刻只能有一个 Tauri supervisor 和一个由它启动的 Runtime：
+Main必须在任何Runtime spawn前调用`app.requestSingleInstanceLock()`。失败实例只提交`{kind=activate,target?{kind,id}}`，校验source/ID/512 bytes，丢弃且不记录raw argv/cwd/path/URL/env/bootstrap值；既有实例等待Runtime reconciliation后才导航opaque target。
 
-- Shell 在生成 bootstrap token、启动 sidecar 或允许任何进程打开 SQLite 之前，先获取以 canonical data-root identity 命名的 OS 原子 supervisor lock；Runtime 在打开 SQLite 前另持有同一 data root 的独占 datastore lock。
-- 自动登录启动与用户手动启动竞争同一把 lock。第二个 Shell 获取失败时，只通过 OS 本机 single-instance IPC 请求现有 Shell 激活窗口，然后退出；它不能生成新 Runtime token、打开数据库、执行 schedule tick 或拥有 shutdown 权。
-- 只有持有 supervisor lock 的 Shell 可以启动、监督和关闭该 data root 的 Runtime/Runner 进程树；只有持有 datastore lock 的 Runtime 可以写 Domain、Queue、ScheduleFire、ExecutionClaim 和 recovery state。
-- lock 必须由 OS handle 生命周期释放，不能把普通 lock file 的存在当成存活证明。辅助 metadata 可以记录 PID、启动时间和 activation endpoint，但只能在重新取得原子 lock 且验证旧 owner 已退出后清理。
-- Shell 崩溃而旧 Runtime 尚未退出时，新 Shell 即使取得 supervisor lock，也必须等待 datastore lock 和已登记进程树在有界期限内释放或完成受控回收；失败时显示可操作的恢复错误并退出，不能并发打开 SQLite。
+Rust Runtime继续按F0-A1规则拥有canonical data root：
 
-F0 必须在 Windows、macOS 和 Linux 实测登录自启与双击竞态、第二实例窗口激活、Shell/Runtime 分别崩溃、stale metadata 和 datastore lock 回收。
+- Main创建受限token file和ready file path，并把显式data root传给签名sidecar。
+- Runtime在打开SQLite前获取该canonical data root的独占datastore lock；同root第二个Runtime失败，不同root的独立Runtime可并行通过F0-A1测试。
+- datastore lock依赖OS handle生命周期释放；stale ready metadata不能代替lock存活证明。
+- Main crash而Runtime尚在退出时，新Main必须等待datastore lock和Runtime进程containment有界收敛；不能并发打开SQLite或自行判断Runner状态。
+- 只有datastore lock owner可以写Domain、Queue、ScheduleFire、ExecutionClaim和recovery state。
+
+F0-A2/F0-A3必须在Windows、macOS、Linux实测登录自启与双击竞态、第二实例窗口激活、Main/Renderer/Runtime分别崩溃、stale metadata和datastore lock回收。
 
 | 方案 | 结论 | 原因 |
 |---|---|---|
-| Rust sidecar | 选择 | 单一原生产物，适合进程树、PTY/ConPTY、SQLite 和 Tauri 打包；故障边界独立 |
-| Node/TypeScript server | 不选 | Paperclip 生态接入直接，但需要携带另一套运行时，平台进程与权限层仍要回到原生实现 |
-| Python/CrewAI sidecar | 不选 | Agent 框架生态成熟，但打包复杂，并会与 Ensemble 已定义的调度和事件状态形成双重所有权 |
-| Tauri 进程内 Runtime | 不选 | 安装物较少，但 Runtime/Runner 故障、重启和测试会与窗口进程耦合 |
+| Electron Shell + Rust sidecar | 选择 | 固定Chromium渲染；Shell与业务Runtime故障边界分离；适合签名安装、平台能力和sidecar监督 |
+| Node/TypeScript业务server | 不选 | 会形成另一套业务运行时，进程、权限、SQLite和调度仍需Rust权威 |
+| Python/CrewAI sidecar | 不选 | 打包复杂，并会与Ensemble已定义的调度和事件状态形成双重所有权 |
+| Electron Main内业务Runtime | 不选 | Node SQLite/PTY/Runner会把窗口进程变成第二状态源并扩大攻击面 |
+| 双生产壳 | 不选 | 会复制安全、transport、package和owner路线，形成兼容债务 |
 
-原 CrewAI/Python Runtime 属于 M0-M5 历史实现，不再是 V2 生产依赖。Organization、Workflow、RunSnapshot 和 Runtime Event 已经定义了产品需要的编排语义；再叠加第二套框架状态机会形成双重所有权。
+原CrewAI/Python Runtime属于M0-M5历史实现，不再是V2生产依赖。Organization、Workflow、RunSnapshot和Runtime Event已经定义产品编排语义；不得再叠加框架状态机。
 
 ## 3. 本机连接与认证
 
 生产链路固定为：
 
 ```text
-React Client
-  -> typed Tauri IPC
-Tauri Shell
-  -> HTTP command/query + WebSocket event/terminal channels
+React Renderer
+  -> frozen typed Preload allowlist / transferred MessagePort
+Electron Main
+  -> authenticated HTTP command/query + WebSocket/binary stream
 Rust Runtime on random loopback port
 ```
 
-- Client 不直接获得 Runtime token、端口或任意进程句柄。
-- Runtime 只监听 loopback，不监听局域网地址。它绑定 `port=0` 让操作系统原子分配端口，再通过 bootstrap channel 回报，避免 Shell 先探测空闲端口产生竞态。
-- Shell 每次启动 Runtime 时生成至少 256 bit 的随机会话令牌，通过继承管道或等价的受限启动通道传递；令牌不放入命令行、日志或业务配置。
-- Runtime 启动后先完成 token 验证、协议版本握手和健康检查，Shell 才向 Client 开放业务 gateway。
-- 业务命令使用 HTTP request/response 并携带 `commandId`；返回值只表示 accepted、rejected 或 conflict。
-- Workspace Event 使用持久 WebSocket 推送，并通过 `sequence` 补齐。断线恢复不依赖前端轮询。
-- Terminal 使用独立的二进制 WebSocket channel，具备 AgentInstance/Runner Handle 绑定、输入 owner 和背压；Terminal 字节不混入 Domain Event。
-- Runtime request channel 默认使用独立的 Attempt-scoped capability token，绑定 Runner Handle generation、AgentInstance、Attempt、PermissionGrant 和允许的请求种类；Handle 停止或 Attempt 终止后立即失效。formal Dispatcher 另有 coordination-scoped token，只绑定 active DispatcherCoordinationLease、Run、AgentInstance、Handle generation、PermissionGrant 和 `workspace_selection`，不绑定已终态业务 Attempt；lease revoke/rotate 或 Run finalization 后立即失效。两者都不复用 Shell 会话令牌。
-- Runtime request channel 是 Adapter 到 Runtime 的结构化内部通道，不允许浏览器、自由模型文本或 Terminal 字节直接调用。
-- 开发预览可以使用开发 transport，但生产协议、DTO 和认证规则必须相同，不能维护第二套业务 API。
+- Renderer不直接获得Runtime token、port、PID、ready path、任意进程句柄或结构化绝对路径。
+- Runtime只监听loopback。它绑定`port=0`，通过F0-A1原子ready descriptor回报实际端口；Main持有ready path和认证材料。
+- Main每次启动Runtime时创建至少256-bit token file；token不进入命令行/Renderer/Preload/URL/业务配置。Shell-exported诊断/log无bootstrap值；restricted lifecycle log可含non-secret PID/loopback port但无token、secret-file contents/path、env/request body/second-instance raw input。
+- Main只从`process.resourcesPath`签名manifest解析sidecar，禁止PATH、仓库、开发产物、Python或旧supervisor fallback。
+- Runtime启动后保持command admission/business write-ready关闭，完成既有token验证、协议握手、Event/command ledger恢复、accepted Draft对账和完整startup classification barrier后，Main才把脱敏ready fact转给Renderer。
+- 业务命令仍携带既有`commandId`；Shell request identity不能替代Domain identity，transport accepted不等于业务成功。
+- Workspace Event与Terminal使用同一exact byte-credit：encoded`frameByteLength`=`ArrayBuffer.byteLength`、`grantBytes`、debit-before-send、contiguous ack、256KiB frame/4MiB outstanding/8MiB queue/30s pause、无lifetime cap；不按chunk invoke。
+- Event断线仍按canonical Domain `sequence`补齐；Shell stream sequence与Domain sequence分开。
+- Terminal使用独立binary stream，最终输入许可仍由Runtime的TerminalInputLease校验。Main不能因port存在或窗口focus放行输入。
+- Runtime request channel继续使用Attempt-scoped或coordination-scoped capability token；这些token不复用Shell session token，也不暴露给Renderer。
+- Workspace-create bridge携带Client预持久化immutable`commandId`；Main把selection绑定该command。retry/Main restart先query Runtime原commandId，accepted无需raw refs；not-recorded才以同command和有效/重选refs重试。Runtime WorkspaceCreateInput/FileRoot/PathGrant/save不变。
+- 开发预览可以使用显式dev build transport，但schema、identity、目录DTO和Domain API必须与生产一致，不能维护第二套业务协议。
 
-首版没有 Agent 级 heartbeat 来驱动工作。Runtime 直接监督本机 Runner 进程和信号流；内部进程 lease 只用于检测失联和防止重复执行。
+完整BrowserWindow、Preload、IPC、MessagePort、opaque selection、sidecar和更新合同见[m6-electron-shell.md](m6-electron-shell.md)。
 
 ## 4. 持久化与执行租约
 
@@ -119,7 +129,7 @@ SQLite 至少持久化：
 - Run、NodeExecution、TaskExecution、TaskAttempt、AgentInstance 和 Attention
 - RunnerInstallation、RunnerProfile、RunnerQualification、ExecutionPolicyVersion、ScheduleLaunchTemplate、RunQueueItem、Schedule、ScheduleFire 和持久化队列
 - RunAmendment、DispatcherCoordinationLease、DispatcherCoordinationLaunch、SpawnRequest、ExecutionWorkspaceSelectionRequest/Assignment、PermissionGrant、PermissionOperationRequest/DecisionDelivery 和 capacity reservation
-- AttemptLaunch、RunnerHandleRegistration、RunnerResult、Message delivery、WorkerResult/Delivery、ExecutionClaim、ShutdownRecoveryPlan、恢复判断和 History 记录
+- AttemptLaunch、RunnerHandleRegistration、ArtifactCandidate、RunnerResult、Message delivery、WorkerResult/Delivery、ExecutionClaim、ShutdownRecoveryPlan、恢复判断和 History 记录
 
 一致性规则：
 
@@ -141,11 +151,13 @@ SQLite 至少持久化：
 ## 5. Runner 与 Seat 生命周期
 
 - 长期存在的是 Seat Session 投影，不是永不退出的进程。Direct Task 每轮消息创建一个 Attempt；单轮结果只进入 idle，`direct_task.end` 或冻结的 idle timeout 才关闭 Direct Run。
-- formal AgentInstance 只有在所属 Run 仍非终态且可能继续派发/对话，并且没有活动 Attempt、待投递消息、终端连接或 active DispatcherCoordinationLease 时，才进入空闲计时，默认 30 分钟后优雅停止；Workspace 的 `formalAgentIdleTimeoutSeconds` 可以在 `60..86400` 秒内配置，并在 Run 的 ExecutionPolicyVersion 中冻结。非终态 Direct Run 只使用 Snapshot 的 `directTaskIdleTimeoutSeconds`，不并行启动 formal process-idle timer；关闭后由 Run-finalization barrier 立即停止 Handle。
+- formal AgentInstance 只有在所属 Run 仍非终态且可能继续派发/对话，并且没有活动 Attempt、待投递消息、终端连接或 coordination protection 时，才进入空闲计时，默认 30 分钟后优雅停止；保护包括 active/rotating lease、面向同一 continued Handle 的 pending replacement lease/launch 和未终态 CoordinationLaunch。Workspace 的 `formalAgentIdleTimeoutSeconds` 可以在 `60..86400` 秒内配置，并在 Run 的 ExecutionPolicyVersion 中冻结。非终态 Direct Run 只使用 Snapshot 的 `directTaskIdleTimeoutSeconds`，不并行启动 formal process-idle timer；关闭后由 Run-finalization barrier 立即停止 Handle。
 - 休眠不会删除 Session、消息、上下文、Artifact 或谱系。下次工作创建新的 AgentInstance，并通过 CLI 原生恢复能力或 ContextPackage 恢复上下文。
 - 正在等待用户输入或处于活动 Attempt 的 Runner 不算空闲。
 - transient worker 在父 Attempt 交付、失败或取消收尾后停止，不转成长期 Seat。
 - Runner 进程结束后保留冻结 Terminal 输出；新的 AgentInstance 不复用旧 Handle。
+- 每个拥有 registered Handle 的 settled Attempt 都创建不可变 Handle disposition record；从未创建 Handle 的 Attempt 不伪造记录。coordination-protected formal Handle 自动 `reuse(reason=active_coordination_lease | coordination_rotation_in_progress)`，保护引用可靠终态前拒绝用户 retain/release 和 idle stop。其它 formal Handle 的 `reuse` 等待下一次正常 AttemptLaunch；`retain` 只在 Adapter 能 input-fence raw Terminal 并提供 typed side-effect-free inspection 时可用，继续占用 capacity；transient 必须 release，coordination-only Handle 由 lease lifecycle 决定。未被 launch 消费且不受保护的 reuse 可改为 retain/release，retain 只可改为 release。Run finalization、Grant/qualification 失效、retain expiry 或 generation 变化先终结保护 lease/launch，再强制 release。
+- Task long-wait checkpoint 只触发 observation/reconciliation/Attention；heartbeat 或输出只证明 liveness，不能终结 Attempt、启动 replacement 或释放 capacity。
 
 ## 6. 持久化队列与定时计划
 
@@ -155,6 +167,7 @@ Schedule 只引用不可变 ScheduleLaunchTemplate，不直接执行当前 Draft
 Schedule
   scheduleId
   workspaceId
+  name
   generation
   configDigest
   launchTemplateRef
@@ -177,13 +190,13 @@ Schedule
 默认值：
 
 - `misfirePolicy=latest`：Runtime 停止期间每个计划最多补跑最新一次。
-- `maxCatchUpRuns=10`：只有显式选择 `all` 时使用，防止恢复后无上限突发执行。
+- `maxCatchUpRuns=10`：只有显式选择 `all` 时使用，合法范围 `1..100`，防止恢复后无上限突发执行。
 - `overlapPolicy=queue_latest`：前一次仍在运行时只保留最新一个待启动 fire。
 - Cron 首版只支持五字段、分钟粒度表达式，依次为 minute、hour、day-of-month、month、day-of-week。支持数字、`*`、列表、范围和 step，Sunday 为 `0`；day-of-month 与 day-of-week 同时受限时使用 Vixie OR 语义。不支持名称、秒、`L/W/#` 或 `@daily` 一类别名。Cron 按保存的 IANA timezone 计算；DST gap 的不存在时间跳过，DST fold 的重复时间只在较早 instant 触发一次。
 - Interval 最小为 60 秒，以保存的 UTC `intervalAnchorAt` 为锚点按 elapsed duration 计算，不受 DST 影响；IANA timezone 只用于展示。
 - Cron 必须只有 `cronExpression`；Interval 必须只有 `intervalSeconds + intervalAnchorAt`。字段组合不合法时不能启用计划。
 
-Schedule 创建时 `generation=1`。每次成功的 `schedule.update | enable | disable | archive` 都在事务内推进 generation 并重算 config digest；digest 覆盖 launch template、trigger、timezone、enabled、misfire/overlap 配置和 archived 状态，不包含 cursor、generation 或时间戳。`schedule.run_now` 必须校验 generation，但不修改它。修改类命令和所有 live/catch-up pass 共用 per-schedule SQLite 写事务。
+Schedule 创建时 `generation=1`。每次成功的 `schedule.update | enable | disable | archive` 都在事务内推进 generation 并重算 config digest；digest 覆盖必填 `name`、launch template、trigger、timezone、enabled、misfire/overlap 配置和 archived 状态，不包含 cursor、generation 或时间戳。`schedule.run_now` 必须校验 generation，但不修改它。修改类命令和所有 live/catch-up pass 共用 per-schedule SQLite 写事务。
 
 Misfire 和 overlap 必须按以下顺序确定，不能依赖内存 tick 次数：
 
@@ -217,11 +230,28 @@ Misfire 和 overlap 必须按以下顺序确定，不能依赖内存 tick 次数
 - Runtime 通过 Shell 发出操作系统通知。通知只包含脱敏摘要；点击后按 scope 打开对应 Workspace、Run 或 Queue Item，以及 Attention。
 - 没有 Client 连接不改变审批语义，也不会把 `ask` 当成 `allow` 或 `deny`。
 
+通知 target 只携带本机 opaque identity：`workspaceId + scopeKind + attentionId? + runId? + queueItemId? + scheduleFireId?`，不得包含路径、Prompt、Artifact 正文、Terminal 内容或秘密。点击只导航，不在系统通知层 Approve/Reject。应用未启动时先激活单实例 Shell，等待 Runtime health 与 reconciliation 完成再解析 target；Attention 已 resolved 时打开只读结果，Queue Item 已创建 Run 时重定向到 Run 并保留来源链，目标不可用时显示 typed unavailable。OS 通知权限关闭不影响应用内 Attention 真源。
+
 ## 8. 风险感知恢复
+
+恢复能力分成五个独立事实：Client UI state、持久化 conversation、live process、Terminal transcript 和 business operation。Client/Webview detach 与关窗到托盘不改变业务状态；graceful Runtime exit 会可靠终止旧 Handle，之后以新 AgentInstance/Attempt 恢复；crash、注销或 OS shutdown 必须先对账。Provider-native session resume 只是可探测的上下文续接能力，transcript replay 只是只读历史；两者都不能证明副作用完成、恢复旧 PermissionGrant 或替代 RecoveryCheckpoint。完整产品矩阵见 [m6-agent-session-collaboration.md](m6-agent-session-collaboration.md)。
 
 ### 8.1 安全退出屏障
 
-显式安全退出必须先覆盖当前 data root 的全部非终态 Run，不能按是否已有进程过滤。Runtime 为每个 Run 持久化唯一 `shutdownFenceId`，然后停止计划触发、新派发、spawn、新 AttemptLaunch/DispatcherCoordinationLaunch 的 prepare/commit、Session/Terminal 输入和 request channel 新 operation。除 idle Direct 外，`running` Run 在建立 fence 的事务先追加 `running -> pausing` 的 `run.status.changed(reasonCode=safe_shutdown_requested)`；已经 `pausing | paused` 的 Run 不重复制造转换。`interrupted | canceling | resuming | preparing` Run 仍按各自 canonical barrier 收敛，不能因没有 Handle 或状态名跳过 fence。
+显式安全退出首先在 sidecar writer/admission serialization 上建立全局 command-admission fence：等待已经进入 admission 临界区的请求持久化 accepted/rejected/conflict 判定，随后拒绝所有新 Domain command（`runtime_shutting_down`），只允许 read/query 和原 command reconciliation。该 fence 不新增 Domain object、API 或 persistence field，直接复用 Runtime lifecycle、durable command ledger 和原 command identity/payload。之后再覆盖当前 data root 的全部非终态 Run，不能按是否已有进程过滤。Runtime 为每个 Run 持久化唯一 `shutdownFenceId`，然后停止计划触发、新派发、spawn、新 AttemptLaunch/DispatcherCoordinationLaunch 的 prepare/commit、Session/Terminal 输入和 request channel 新 operation。除 idle Direct 外，`running` Run 在建立 fence 的事务先追加 `running -> pausing` 的 `run.status.changed(reasonCode=safe_shutdown_requested)`；已经 `pausing | paused` 的 Run 不重复制造转换。`interrupted | canceling | resuming | preparing` Run 仍按各自 canonical barrier 收敛，不能因没有 Handle 或状态名跳过 fence。
+
+Shell 使用 typed shutdown API，不把 `quit(): Promise<void>` 当作产品合同：
+
+```text
+request_shutdown(mode=safe_pause | cancel_runs) -> shutdownRequestId
+subscribe_shutdown_progress(shutdownRequestId)
+continue_waiting(shutdownRequestId)
+force_quit(shutdownRequestId)
+```
+
+进度按Run返回`fencing | waiting_runner | reconciling | safe | needs_verification`，并携带真实subject refs，不伪造百分比。默认观察期限为30秒；到期只开放**Continue waiting**与**Force quit**。shutdown fence建立后不能通过Esc/Back取消，因为首版没有unfence command。`force_quit`不写安全完成；Electron Main只保存supervisor marker/脱敏诊断并终止owned Rust sidecar。Runtime与OS parent-death/platform containment拥有Runner descendants；Main不得枚举、kill或重分类Runner child。`cancel_runs`逐Run进入既有cancel barrier，不宣称跨Workspace原子取消；全部Run收敛后才退出。
+
+command-admission fence 生效后，Runtime 扫描 durable command ledger 中每条 accepted 且缺少 terminal result 的 Draft command，并用已保存的原 `commandId + expectedRevision + operationDigest + operations[]` 幂等重新派发或对账。matching `orchestration.draft.applied` Event，或 durable rejected/conflict result，才终结该 row；accepted receipt 不能终结。该 drain 不等待 buffered/local-only batch promotion。零 active Run 时，只有 Client journal flush、admission fence和本 drain 完成后才能直接退出。
 
 Runtime 独立计算每个 fenced Run 的 process/Unknown reconciliation set 和 process-free pre-Attempt aggregate set。存在非 stopped RunnerHandleRegistration、可能已创建 process 的 in-flight launch，或 unresolved cleanup resource 时创建 ShutdownRecoveryPlan；没有这些 candidate 时不创建空 plan。Runtime 对每个 primary/transient/coordination registration 调用 `quiesce_for_shutdown`，包括已 paused、没有活动 Attempt 的 idle Direct Handle 和承载 active coordination lease 的 Handle。每个 Handle 必须返回绑定 shutdown fence、RunnerHandleRegistration、Handle generation、可选 source Attempt/lease 和最后 operation sequence 的 typed ShutdownFenceReceipt；`completed` 证明进程树已不存在，`quiesced` 只证明不再接受 operation。Runtime 先持久化所有 receipt/checkpoint 与 fenced/quiesced lifecycle Event，再确认 fence 后没有新 operation，最后冻结 `liveHandles[]` 覆盖 fence 时全部 registration、`inFlightLaunches[]` 覆盖无 registration 的 process candidate、attempt-kind record 的完整 `pendingDispatcherCoordinationLeaseIds[]`，以及覆盖其它 Unknown 的 `unresolvedCleanupSubjectRefs[]`。
 
@@ -231,20 +261,23 @@ plan、`run.shutdown.recovery_plan_created` 和 `shutdownRecoveryPlanId` 先在�
 
 无论 Run 是否创建 plan，未被任何 shutdown record 或 plan owner 覆盖、状态明确且从未启动的 pre-Attempt aggregate 都执行相同 process-free disposition：`pending_delivery | awaiting_selection | validating` SelectionRequest blocked；旧 request/target 的 open `workspace_selection_blocked` Attention 由 Runtime 以 `superseded_by_safe_exit_before_launch` resolve；随后 assignment released，Grant revoked，`created | provisioning` target AgentInstance 以 `not_started/safe_exit_before_launch` stopped并释放 capacity，TaskExecution 最后释放 claim、清除旧 target refs、进入 interrupted并保留同一 pending owner。旧 SelectionRequest 已 blocked 或 assigned 时不改写，assigned 只释放 assignment，但两者都不能留下可操作的旧 selection Attention。资源 Unknown 时加入 plan cleanup owner或拒绝 acknowledgement。
 
-process/Unknown 和 process-free aggregate 两类工作全部收敛后，Run 才按 `pausing -> paused`、`preparing | resuming -> interrupted`、同状态或既有 finalization 终态追加 `run.status.changed(reasonCode=safe_shutdown_completed, shutdownFenceId, shutdownRecoveryPlanId?, resumeOnStartup=false)`；存在 plan 时必须携带 plan ref。全部 completion Event durable 后才向 Shell 返回 shutdown acknowledgement。cancel/finalization intent 只继续原 barrier。任一 termination 或 cleanup Unknown 不返回安全 acknowledgement，Shell 强制路径只写 supervisor marker 并终止进程树，由下次 Runtime 对账，不能提前声称 stopped。
+process/Unknown 和 process-free aggregate 两类工作全部收敛后，Run 才按 `pausing -> paused`、`preparing | resuming -> interrupted`、同状态或既有 finalization 终态追加 `run.status.changed(reasonCode=safe_shutdown_completed, shutdownFenceId, shutdownRecoveryPlanId?, resumeOnStartup=false)`；存在 plan 时必须携带 plan ref。全部 Run completion Event durable，且 accepted Draft drain 每一 row 都已有 terminal result 后，才向 Shell 返回 shutdown acknowledgement。cancel/finalization intent 只继续原 barrier。现有 30 秒 wait 内任一 Run cleanup 或 accepted Draft row 未收敛，都不返回安全 acknowledgement，只保留 Continue waiting / Force quit。Force quit/crash可以绕过drain；Main强制路径只写supervisor marker/脱敏诊断并终止Rust sidecar，不枚举Runner child。Runner进程树由Rust parent-death/platform containment收敛，下次Runtime在write-ready前处理原ledger row且Main不能提前声称stopped。
 
 ### 8.2 启动与执行恢复
 
 系统重启、Runtime 崩溃或 Runner 异常退出后，Runtime 先恢复账本，再处理工作：
 
-1. 回放 Workspace Event 并校验最后快照。
-2. 对账 supervisor marker、RunnerHandleRegistration、DispatcherCoordinationLease/Launch、SpawnRequest、AttemptLaunch、Message/WorkerResult/PermissionDecision delivery 和 ExecutionWorkspaceSelectionRequest。prepared/committed 状态不明时只查询原 ID；不能重建第二 Handle、重复消息/批准、迁移旧 lease request 或默认选择目录。
-3. 回收或确认已登记进程，过期 ExecutionClaim 不直接视为失败或成功；capacity reservation 必须等 Handle 和目录资源状态明确后释放。
-4. 已有可信 RunnerResult、完成回执和完整 Artifact 的 Attempt 保持终态，不重复执行。RunnerResult 必须与原 AgentInstance、Attempt、Handle generation 和 digest 完全匹配。
-5. Runtime 根据账本和可靠证据把未完成 Attempt 标记为 `interrupted`，并保存、对账每个 operation 的 checkpoint set、Runner receipt 和副作用证据。Shell 不写 Attempt 或 Run 状态。
-6. Runtime 为 ShutdownRecoveryPlan 中每个可恢复的 source Attempt 幂等确认旧 Attempt 已为 `interrupted/safe_shutdown_process_closed`、旧 AgentInstance 已 stopped 且 `currentAttemptId` 已清除，再在原 TaskExecution 登记 `pendingAttemptKind=recovery`、来源 Attempt 和 Resume command，执行 `paused | interrupted -> provisioning`；已经 terminal failed 的 TaskExecution 不可复活。从未创建 Attempt/launch、旧 pre-launch aggregate 已全部 Event-closed且仍有完整 pending owner 的 `safe_exit_before_launch` 使用独立 `continue_pre_attempt` target，从 `interrupted -> provisioning` 继续同一 owner。它只要求当前 TaskExecution 没有 plan owner，可以与同 Run 的 plan recovery target 并存；新实例没有 recovery lineage，新的 SelectionRequest 引用旧 request，不创建 recovery Attempt或复用旧资源。
-7. 统一 pre-Attempt pipeline 为 primary 与每个需要继续的 transient source Handle 建立 replacement AgentInstance、capacity、独立 Grant/assignment。全部必需 assignment 就绪后只创建一个新的 recovery Attempt，清除 pending 字段，并用 `recoveredFromAgentInstanceId` / `recoveredFromAttemptId`、逐 operation `recoveryContexts[]` 保存来源。新 transient 同时用 parent refs 指向恢复后的父实例/Attempt；旧 `parent*` 字段不能承担恢复谱系。
-8. recoverable Attempt 带有 `coupledDispatcherCoordinationLeaseIds[]` 时，在同一个 recovery AttemptLaunch prepare 前预创建 higher-generation pending lease 和 dormant channel；同一个 replacement registration/commit 同时恢复 Attempt 和激活 lease，不创建 DispatcherCoordinationLaunch 或第二个 Handle。每个 coordination-only entry 才单独创建 replacement formal AgentInstance、capacity、Grant/assignment、coordination ContextPackage、唯一 DispatcherCoordinationLaunch 和 pending target lease；reliable committed 后只激活已投递的 dormant lease/token，不创建 TaskAttempt 或 RunnerResult。
+1. 取得 datastore lock，加载 Workspace Event、Snapshot 和 durable command ledger；command admission/write-ready 继续关闭。
+2. 回放 Workspace Event 并校验最后快照。对每条 accepted 且缺少 applied/rejected/conflict terminal result 的 Draft ledger row，只用保存的原 `commandId`、expected revision、digest 和 operations 幂等重新派发或对账；不得创建新 command。matching Event 或 durable rejected/conflict result 落盘后才终结该 row。
+3. 全部上述 row 收敛只关闭 command-ledger 子屏障，Runtime command admission/business write-ready 仍保持关闭；任一 row 仍 Unknown 时继续 `runtime_reconciling`/只读并提供 Retry reconciliation 或 Force quit 诊断。
+4. 对账 supervisor marker、RunnerHandleRegistration、DispatcherCoordinationLease/Launch、SpawnRequest、AttemptLaunch、Message/WorkerResult/PermissionDecision delivery 和 ExecutionWorkspaceSelectionRequest。prepared/committed 状态不明时只查询原 ID；不能重建第二 Handle、重复消息/批准、迁移旧 lease request 或默认选择目录。
+5. 回收或确认已登记进程，过期 ExecutionClaim 不直接视为失败或成功；capacity reservation 必须等 Handle 和目录资源状态明确后释放。
+6. 已有可信 RunnerResult、完成回执和完整 Artifact 的 Attempt 保持终态，不重复执行。RunnerResult 必须与原 AgentInstance、Attempt、Handle generation 和 digest 完全匹配。
+7. Runtime 根据账本和可靠证据把未完成 Attempt 标记为 `interrupted`，并保存、对账每个 operation 的 checkpoint set、Runner receipt 和副作用证据。Shell 不写 Attempt 或 Run 状态。
+8. Runtime 为 ShutdownRecoveryPlan 中每个可恢复的 source Attempt 幂等确认旧 Attempt 已为 `interrupted/safe_shutdown_process_closed`、旧 AgentInstance 已 stopped 且 `currentAttemptId` 已清除，再在原 TaskExecution 登记 `pendingAttemptKind=recovery`、来源 Attempt 和 Resume command，执行 `paused | interrupted -> provisioning`；已经 terminal failed 的 TaskExecution 不可复活。从未创建 Attempt/launch、旧 pre-launch aggregate 已全部 Event-closed且仍有完整 pending owner 的 `safe_exit_before_launch` 使用独立 `continue_pre_attempt` target，从 `interrupted -> provisioning` 继续同一 owner。它只要求当前 TaskExecution 没有 plan owner，可以与同 Run 的 plan recovery target 并存；新实例没有 recovery lineage，新的 SelectionRequest 引用旧 request，不创建 recovery Attempt或复用旧资源。
+9. 统一 pre-Attempt pipeline 为 primary 与每个需要继续的 transient source Handle 建立 replacement AgentInstance、capacity、独立 Grant/assignment。全部必需 assignment 就绪后只创建一个新的 recovery Attempt，清除 pending 字段，并用 `recoveredFromAgentInstanceId` / `recoveredFromAttemptId`、逐 operation `recoveryContexts[]` 保存来源。formal primary recovery 只携带 Attempt recovery pair；每个 recovered transient 必须同时携带当前 replacement parent/新 recovery Attempt/原 SpawnRequest 的 parent-spawn triple，以及旧 transient/source Attempt 的 recovery pair。普通 transient 只有 parent-spawn triple；旧 `parent*` 字段不能承担 recovery pair。
+10. recoverable Attempt 带有 `coupledDispatcherCoordinationLeaseIds[]` 时，在同一个 recovery AttemptLaunch prepare 前预创建 higher-generation pending lease 和 dormant channel；同一个 replacement registration/commit 同时恢复 Attempt 和激活 lease，不创建 DispatcherCoordinationLaunch 或第二个 Handle。每个 coordination-only entry 才单独创建 replacement formal AgentInstance、capacity、Grant/assignment、coordination ContextPackage、唯一 DispatcherCoordinationLaunch 和 pending target lease；该 AgentInstance 只携带 coordination recovery triple，parent/spawn 与 Attempt recovery refs 必须为空。reliable committed 后只激活已投递的 dormant lease/token，不创建 TaskAttempt 或 RunnerResult。
+11. Runtime 最后执行 startup classification barrier：逐项确认每个 supervisor marker、AttemptLaunch/CoordinationLaunch、Message/WorkerResult/Permission delivery、RunnerHandleRegistration、ExecutionClaim、TaskAttempt/TaskExecution、ShutdownRecoveryPlan entry、`continue_pre_attempt` 和 coordination recovery owner 都已 durable 映射到唯一 canonical 稳定状态/owner。可以继续自动运行的项已绑定唯一 durable claim/launch/owner；需要人工处理的项必须已经稳定为 `interrupted/degraded` 或 matching blocked 状态并创建 typed Attention。barrier 不等待用户 resolve Attention，但不允许遗留未归属 Unknown、临时 owner、未持久化 lineage 或仅存在内存中的决定。只有该 barrier 完成后，Runtime 才通过既有 health/reconciliation ready fact 开放普通 Domain writes；不新增 API、Event 或持久字段。
 
 只有 `resumeOnStartup=true` 的 Run 自动进入上述流程。用户手动 Pause 或 Runtime 已确认的托盘安全退出保持 `resumeOnStartup=false`，重新打开后由用户继续；Resume 进入 `resuming` 屏障时先设为 `true`。强制退出、shutdown 未确认、注销、关机、崩溃中断或 resuming 状态不明时不关闭该标记。
 
@@ -267,8 +300,8 @@ Checkpoint 使用 write-ahead persistence barrier。Adapter 或 platform broker 
 | `dispatched | acknowledged` + `idempotent` + 有效幂等键和目标状态 | `retry_idempotent`；使用同一幂等键重试，并重新验证目标状态 |
 | `acknowledged` + 可验证 `runnerResumeRef` + Adapter `checkpointResume=true` | `resume_runner`；ref 必须证明 continuation 位于该 operation 之后，并且恢复不会重放更早 operation |
 | `committed` + 可验证 `committedResultRef` | `continue_after_commit`；把结果放入恢复计划并明确跳过该操作，再继续 Artifact Contract 校验或后续节点 |
-| `dispatched` + `non_idempotent | unknown`，或没有满足上述条件的 `acknowledged` | 暂停并创建 Run-scoped Attention |
-| 缺少 checkpoint，或 checkpoint 不覆盖最新操作 | 按 `unknown` 处理，暂停并创建 Attention |
+| `dispatched` + `non_idempotent | unknown`，或没有满足上述条件的 `acknowledged` | 暂停并创建 `recovery_operation_unknown` Attention |
+| 缺少 checkpoint，或 checkpoint 不覆盖最新操作 | 按 `unknown` 处理，暂停并创建 `recovery_operation_unknown` Attention |
 
 同一最高 phase 命中多个安全条件时，选择顺序固定为 `continue_after_commit`、`resume_runner`、`retry_idempotent`、`restart_no_side_effect`、`restart_before_dispatch`；Runtime 必须把选择依据写入 recovery Event，Adapter 不能自行降级或换策略。
 
@@ -282,6 +315,8 @@ RecoveryCheckpoint 的来源和字段以 [m6-domain-model.md](m6-domain-model.md
 - 权限、Runner Profile 或 CLI 版本已变化。
 
 Runtime 不能通过“文件看起来已经存在”、终端最后一行或模型自述推断操作成功。
+
+`recovery_operation_unknown` 只能针对具体 operation 提供 inspect、带验证结果引用的 record completed、带未发生证据的 record not completed and retry、End as failed 或 Cancel。任何人工裁决都保存 evidence refs 和 result Event refs；不能把用户选择伪造成 Runner/provider receipt。
 
 interrupted Run 固定按三类互斥入口处理：带 `terminationIntent=cancel` 的 Run 只能由重复 `run.cancel` 或 `attention.resolve(continue_cancel)` 幂等继续同一个 frozen cancel barrier；已经冻结其它 `finalizationOutcome` 的 Run 只能通过 `run.resume` 或 `attention.resolve(continue_finalization)` 幂等继续原 finalization barrier，不能恢复业务或用 `run.end_failed` 覆盖 outcome；两者都不存在时才允许业务恢复，或由 `run.end_failed` 冻结 `terminationIntent=fail` 与 `failed/interrupted_ended` intent。所有 finalization 都只有在 Handle、worker、assignment、capacity 和临时资源全部收敛后提交终态，状态不明时继续保持 `interrupted + degraded`。
 
@@ -319,14 +354,17 @@ Paperclip 对 Ensemble 有参考价值，但只参考 Backend 机制：
 
 以下都是待证明条件，不是文档写下后就算完成：
 
-- Rust sidecar 在三平台随 Tauri 安装、签名、启动、重启和升级。
-- 同一 data root 的 OS supervisor/datastore lock、第二实例激活转交和 crash/stale-lock 回收在三平台成立，任何竞态都不会启动第二个 scheduler 或并发打开 SQLite。
+- 精确固定的Electron/Chromium与签名Rust sidecar在三平台安装、启动、重启、原子升级和卸载；sidecar只从`process.resourcesPath`签名manifest解析。
+- Electron app single-instance、同一data root的Runtime datastore lock、第二实例激活和crash/stale-ready回收在三平台成立，任何竞态都不会启动第二scheduler或并发打开SQLite。
 - 关闭窗口后托盘继续运行；显式退出、注销和关机不留下无主 Runner。
 - SQLite WAL、ExecutionClaim 和 ScheduleFire 在崩溃窗口内不重复执行。
-- HTTP/WebSocket 鉴权、协议协商、事件补齐和 Terminal 背压成立。
+- graceful quit 的 sidecar-wide command-admission fence 与 accepted Draft drain 在零/多 active Run、30 秒 timeout、Force quit 和 crash/restart 窗口成立；startup 在 write-ready 前只重放原 commandId/payload。
+- startup write-ready 不在 accepted Draft 子屏障后提前打开；全部 marker/launch/delivery/Handle/claim/Attempt/recovery owner 均已 durable 分类，或进入 interrupted/degraded + typed Attention 后，既有 readiness fact 才允许 Domain writes。
+- BrowserWindow/Preload/IPC来源与schema安全、HTTP/WebSocket鉴权、协议协商、Event/Terminal MessagePort sequence/credit/backpressure和stale-port失效成立。
 - `pi`、Codex CLI、Claude Code 在三平台均能以同一 Handle 提供 Session、原样 Terminal 和 ContextPackage。
 - 三个 Adapter 在三平台真实执行当前 PermissionGrant；无法执行的限制不能用 Prompt 代替。
 - formal Seat 空闲休眠、transient worker 回收、系统重启恢复和计划补跑符合本规格。
 - 风险感知恢复不会重复非幂等副作用；状态不明时稳定产生 Attention。
+- ordinary transient、formal Attempt recovery、recovered transient 和 coordination-only recovery 四种 AgentInstance lineage 组合分别通过持久化/恢复测试；recovered transient 两组 lineage 缺一即拒绝，coordination-only 不生成 Attempt refs。
 
 任一硬门槛被真实平台证据否定时，必须回到产品决策重新裁剪范围，不能加入隐藏的兼容或降级路径。

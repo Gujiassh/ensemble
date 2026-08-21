@@ -1,5 +1,7 @@
 # Parallel Gate M2
 
+> **HISTORICAL / NOT CURRENT AUTHORIZATION.** This file records a superseded Tauri-era plan, implementation, review, or ownership result. Current Electron shell architecture and implementation ownership are defined by [m6-electron-shell.md](../m6-electron-shell.md) and [m6-interaction-implementation-slices.md](../m6-interaction-implementation-slices.md).
+
 - date: 2026-08-18
 - main_controller: main-session
 - G1 evidence: docs/specs/reviews/M1-canvas-2026-08-18.md · ACCEPT

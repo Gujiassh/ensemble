@@ -1,16 +1,16 @@
 # F1 Spec: Desktop Shell, Design System, and Workspace Entry
 
-**Status**: Current implementation specification, revised 2026-08-19
+**Status**: Current Renderer reacceptance and Electron integration specification, revised 2026-08-21; implementation paused
 **Owner**: F1-A frontend lane, followed by an F1-B desktop integration lane
-**Depends on**: [m6-product-rebuild.md](m6-product-rebuild.md), [m6-architecture.md](m6-architecture.md), [m6-domain-model.md](m6-domain-model.md), [m6-orchestration-interaction.md](m6-orchestration-interaction.md), [../08-design-language.md](../08-design-language.md), [../ssot/design-system.md](../ssot/design-system.md), [../ssot/i18n.md](../ssot/i18n.md)
+**Depends on**: [m6-product-rebuild.md](m6-product-rebuild.md), [m6-architecture.md](m6-architecture.md), [m6-domain-model.md](m6-domain-model.md), [m6-orchestration-interaction.md](m6-orchestration-interaction.md), [../08-design-language.md](../08-design-language.md), [../ssot/design-system.md](../ssot/design-system.md), [../ssot/i18n.md](../ssot/i18n.md), [m6-electron-shell.md](m6-electron-shell.md)
 **Review rule**: This specification is the implementation source for F1. Existing M0-M5 code, fixtures, API routes, and visual patterns are not requirements.
 
 ## 1. Outcome
 
 F1 produces the first usable desktop-facing product surface. It is delivered in two lanes:
 
-- **F1-A Client Foundation** can start after this specification is accepted. It covers the React shell, design system, preferences, i18n, Workspace entry flow, and typed gateway seam.
-- **F1-B Desktop Integration** starts only after F0 proves the selected Rust Runtime sidecar on the target platform. It binds platform preferences, directory selection, tray lifecycle, Runtime supervision, and the real gateway in Tauri.
+- **F1-A Renderer Reacceptance** covers the React shell, design system, preferences, i18n, Workspace entry flow, typed gateway seam, opaque native-directory DTO, root reconciliation, and absence of Electron/Runtime bootstrap leakage. Existing visual evidence remains partial evidence only for unchanged surfaces. F1-A does not resume until the product owner authorizes the required implementation stage.
+- **F1-B Electron Integration** starts only after F0-A3 proves the selected Electron + Rust Runtime sidecar on Windows, macOS, and Linux. It binds platform preferences, opaque directory selection, tray lifecycle, Runtime supervision, MessagePort streams, and the real Canvas gateway through the frozen Preload bridge.
 
 The combined phase delivers:
 
@@ -19,7 +19,7 @@ The combined phase delivers:
 3. A first-start path that handles boot, backend unavailable, no Workspace, and Workspace creation.
 4. A Workspace creation flow for name, project directory, Runner profile, permissions, and Agent output locale.
 5. A typed boundary between the client and future Runtime services. F1 must not invent a second persistence or business-state protocol.
-6. A verification surface that can be run in a browser and inside the Tauri shell without old development controls.
+6. A verification surface that can be run in a browser and inside the Electron shell without old development controls; browser evidence never substitutes for packaged Electron proof.
 
 F1-A is a product-surface slice. It does not claim that a Workspace has been persisted or that a Run can execute. F1-B supplies the selected Runtime connection, but Workspace business persistence and Run execution remain F2/F3 responsibilities.
 
@@ -42,16 +42,16 @@ F1-A is a product-surface slice. It does not claim that a Workspace has been per
 
 ### 2.2 Included in F1-B after F0
 
-- Tauri-backed device preference adapter.
-- Platform directory picker capability.
-- Runtime connection and startup status adapter selected by F0.
+- Electron-backed device preference adapter through the frozen typed bridge.
+- Platform directory picker capability returning opaque `selectionRef/displayName/access/expiresAt`, never a structured raw path.
+- `apps/canvas/src/runtime-gateway/electron-gateway.ts` consuming the frozen bridge selected by F0.
 - Desktop startup, retry, diagnostics, quit, and clean shutdown wiring.
 - A desktop build that loads bundled frontend assets without Vite.
 
 ### 2.3 Excluded from all of F1
 
 - Runtime sidecar implementation.
-- Runtime authentication, port allocation, process supervision, or platform packaging.
+- Runtime authentication, port allocation, sidecar supervision, Electron security, or platform packaging; these belong to F0-A2/F0-A3.
 - Real Runner probing or `pi`/Codex CLI/Claude Code execution. F1 uses typed probe results supplied by a gateway or test fixture.
 - Organization and Workflow editing, task dependencies, gates, joins, rework, or Run Snapshot creation.
 - Run status, Handoff, Attention, Artifact, SSE, or command/event persistence.
@@ -72,7 +72,7 @@ Anything in the excluded list must be represented by an interface or an unavaila
 | Locale | UI locale and Agent output locale are separate values |
 | Theme | Components read semantic tokens, never raw color literals or theme names |
 | Platform | OS differences come through shell capabilities, not component-level user-agent branches |
-| Runtime seam | Client calls a typed gateway; unavailable Runtime is a first-class state |
+| Runtime seam | Client calls a typed gateway backed by one frozen Preload allowlist; unavailable Runtime is a first-class state |
 | Existing code | Old components and data may be removed; compatibility wrappers are prohibited |
 
 ## 4. User-visible states
@@ -80,13 +80,10 @@ Anything in the excluded list must be represented by an interface or an unavaila
 The application root owns a finite state machine. A state transition must replace the previous state rather than briefly render stale Workspace content.
 
 ```text
-booting
-  -> restoring_preferences
-  -> checking_backend
-  -> startup_error
-  -> no_workspace
-  -> workspace_loading
-  -> ready
+booting -> restoring_preferences -> checking_backend
+checking_backend -> startup_error | runtime_reconciling
+runtime_reconciling -> startup_error | no_workspace | workspace_loading
+workspace_loading -> ready | startup_error
 ```
 
 ### 4.1 `booting`
@@ -107,7 +104,15 @@ booting
 - Show a connection state that is useful to a person, not a raw URL, PID, port, or Python error.
 - Do not allow Workspace submission while the gateway is unknown.
 
-### 4.4 `startup_error`
+### 4.4 `runtime_reconciling`
+
+- Enter only after the gateway is authenticated and reports that Runtime ledger/projection reconciliation is required before product state can be trusted.
+- Render a stable Shell-level progress surface with localized phase and diagnostics access. A known Workspace identity may be shown, but no previous business projection, editable Canvas, Run action, or stale selection may render as current.
+- Reconciliation applies persisted events and a typed Snapshot before deciding `no_workspace`, `workspace_loading`, or `ready`. UI animation, connection availability, and cached Client state cannot complete this state.
+- A recoverable interruption retries the same reconciliation identity. A terminal reconciliation failure enters `startup_error` with a stable diagnostic code; it must not bypass reconciliation and open a half-connected Workspace.
+- F1-A must model and render the state even when its injected test gateway completes reconciliation immediately. F1-B binds it to the selected Runtime startup contract.
+
+### 4.5 `startup_error`
 
 Show:
 
@@ -116,15 +121,15 @@ Show:
 - **Open diagnostics**,
 - and a non-destructive **Quit** action when the shell exposes it.
 
-Retry repeats the check with the same preferences. It must not reset the form or create a new Workspace.
+Retry repeats the failed backend check or Runtime reconciliation with the same preferences and stable request identity. It must not reset the form or create a new Workspace.
 
-### 4.5 `no_workspace`
+### 4.6 `no_workspace`
 
 - Show the Workspace entry action and a quiet empty canvas background.
 - The primary action is **Create Workspace**.
 - Do not show a fake recent Run, sample Organization, fixture switcher, or Runner mode toggle.
 
-### 4.6 `workspace_loading` and `ready`
+### 4.7 `workspace_loading` and `ready`
 
 - Show Workspace identity before loading the full projection.
 - Keep the canvas non-editable until its typed projection is ready.
@@ -142,6 +147,7 @@ apps/canvas/src/
   preferences/     schema, validation, adapter, preference store
   i18n/            locale resources, formatter, locale store
   workspace/       creation flow, form state, Runner probe view, gateway port
+  runtime-gateway/  Electron bridge consumer; production file is electron-gateway.ts
   inspector/       selection-driven panel shell and object-section contract
   settings/        device settings surface
   test-support/    typed fixtures and render helpers only
@@ -152,7 +158,8 @@ Ownership rules:
 - `app-shell` coordinates regions and root state; it does not validate Runner profiles or mutate Workspace data.
 - `design-system` owns visual tokens and primitive interaction states; it does not know Organization or Run semantics.
 - `preferences` owns device settings only; it never writes Workspace or Run data.
-- `workspace` owns form state and commands to the gateway; it does not invent a persistence result.
+- `workspace` owns form state and commands to the gateway; it does not invent a persistence result or inspect raw paths.
+- `runtime-gateway/electron-gateway.ts` consumes only `window.ensemble` typed methods; it does not import Electron, access `ipcRenderer`, or learn Runtime token/port/PID/ready path.
 - `canvas` owns viewport and selection state only; it does not derive business status from labels or timing.
 - `inspector` renders typed sections supplied by the selected projection; it does not become a second router.
 
@@ -270,7 +277,7 @@ The inspector is a conditional fourth surface. It must not reserve width when cl
 
 | Window | Required behavior |
 |---|---|
-| `>=1440px` | Inspector may dock at `--inspector-width`; canvas remains usable |
+| `>=1440px` | Inspector docks at `--inspector-width`; canvas remains usable |
 | `1024-1439px` | Inspector overlays the canvas as a sheet; it does not shrink the main canvas below usability |
 | `<1024px` | Compact fallback for development and accessibility testing; not the primary release size |
 | Minimum target | `1024x680` |
@@ -302,6 +309,8 @@ F1 supplies the viewport boundary and empty/loading/error states. A typed projec
 - Opens from a selected object or Attention destination.
 - Uses a stable shell with typed sections.
 - Docked on wide windows and overlaid on ordinary windows.
+- The `1024-1439px` overlay is non-modal: it has no backdrop or focus trap, does not resize the central surface, and closes on explicit Close or the topmost-layer Escape action. Pointer interaction outside closes it only when no form is dirty.
+- Crossing the dock/overlay breakpoint preserves the target object, active section, scroll anchor, and logical focus.
 - Escape closes it and returns focus to the invoking object.
 - It must not show raw protocol payloads, internal IDs, or Runner secrets in default sections.
 
@@ -316,12 +325,19 @@ name -> project directory -> Runner profile -> permissions -> Agent output local
 ### 8.1 Form state
 
 ```ts
+type NativeDirectorySelection = {
+  selectionRef: string;
+  displayName: string;
+  access: "read" | "write";
+  expiresAt: string;
+};
+
 type WorkspaceCreateDraft = {
   name: string;
-  projectPath: string | null;
+  projectDirectory: NativeDirectorySelection | null;
   runnerProfileId: string | null;
   permissionProfile: "read_only" | "workspace_write" | "selected_paths" | "full_access";
-  pathGrants: Array<{ path: string; access: "read" | "write"; scope: "workspace" }>;
+  pathGrantSelections: Array<NativeDirectorySelection & { scope: "workspace" }>;
   capabilityPolicies: WorkspaceCapabilityPolicies;
   outputLocale: "zh-CN" | "en-US";
   step: "name" | "project" | "runner" | "permissions" | "output-locale" | "review";
@@ -348,11 +364,13 @@ This draft is transient. It must not be serialized as `WorkspaceConfig` before t
 
 ### 8.3 Project directory
 
-- Use a shell directory picker through a capability interface.
-- Accept only an existing readable directory at this stage.
-- Preserve the platform path as supplied; do not replace separators manually.
-- Display an understandable path summary and provide the full value through accessible text or tooltip.
-- Distinguish missing, unreadable, unwritable, and picker-denied outcomes.
+- Use a named shell directory-picker method through the frozen capability interface.
+- The Renderer receives only `selectionRef`, `displayName`, requested `access`, and `expiresAt`; it never receives or reconstructs a structured absolute path.
+- Treat `displayName` as a non-authoritative label. It is not identity, cannot be submitted as a path, and must not become a full-path tooltip.
+- Before returning the picker DTO, Main creates an unbound ref bound only to source `webContents`, main frame, purpose, access, expiry, and the validated real path.
+- The Client allocates and persists the immutable Domain `commandId` before create dispatch; during create validation, Main atomically transitions each matching ref from `unbound` to `bound(commandId)`.
+- Distinguish missing, unreadable, unwritable, expired, already-consumed, wrong-purpose, and picker-denied outcomes with stable codes.
+- Runtime-local path normalization and persistence remain unchanged; the Electron boundary only hides the structured raw path from Renderer.
 
 ### 8.4 Runner profile
 
@@ -393,7 +411,7 @@ Rules:
 
 - The default profile is `workspace_write`.
 - The user can choose `read_only`, `selected_paths`, or `full_access`.
-- `selected_paths` uses the native directory picker and stores separate read/write grants. Workspace creation uses `workspace` scope; later Session/Run controls can add Attempt- or Run-scoped grants.
+- `selected_paths` uses the native directory picker and keeps separate opaque read/write selections in the Renderer. Workspace creation uses `workspace` scope; Main binds and resolves each ref only for its immutable Domain commandId, and Runtime persists the same path grants as before. Later Session/Run controls can add Attempt- or Run-scoped grants through the same boundary.
 - Network, external process execution, writes outside the Workspace, destructive commands, and external publishing each use `allow | ask | deny`.
 - Full access is visibly marked and does not disable secret redaction or attachment warnings.
 - The review step shows the resolved profile, selected paths, and capability policies without rendering secret values.
@@ -409,18 +427,82 @@ The persistence and secret rules are defined in [m6-execution-workspace-security
 ### 8.7 Create command boundary
 
 ```ts
-type WorkspaceCreateInput = {
+type ConnectionState =
+  | { kind: "checking" }
+  | { kind: "unavailable"; code: string; retryable: boolean }
+  | { kind: "runtime_reconciling"; reconciliationId: string; phaseKey: string }
+  | { kind: "ready"; protocolVersion: number; capabilities: string[] };
+
+type NativeDirectorySelection = {
+  selectionRef: string;
+  displayName: string;
+  access: "read" | "write";
+  expiresAt: string;
+};
+
+type WorkspaceCapabilityPolicies = {
+  networkAccess: "allow" | "ask" | "deny";
+  externalProcessExecution: "allow" | "ask" | "deny";
+  writesOutsideWorkspace: "allow" | "ask" | "deny";
+  destructiveCommands: "allow" | "ask" | "deny";
+  externalPublish: "allow" | "ask" | "deny";
+};
+
+type RunnerProbeResult = {
+  id: string;
+  displayName: string;
+  status:
+    | "probing"
+    | "available"
+    | "not_installed"
+    | "installed_incompatible"
+    | "missing_configuration"
+    | "unsupported_platform"
+    | "probe_failed";
+  version?: string;
+  adapterVersion: string;
+  supportedVersionRange: string;
+  authenticationStatus: "signed_in" | "signed_out" | "unknown" | "not_applicable";
+  capabilities: string[];
+  messageKey?: string;
+};
+
+type WorkspaceCreateBridgeInput = {
+  commandId: string;
   name: string;
-  projectPath: string;
+  projectSelectionRef: string;
   runnerProfileId: string;
   permissionProfile: "read_only" | "workspace_write" | "selected_paths" | "full_access";
-  pathGrants: Array<{ path: string; access: "read" | "write"; scope: "workspace" }>;
+  pathGrantSelections: Array<{
+    selectionRef: string;
+    access: "read" | "write";
+    scope: "workspace";
+  }>;
   capabilityPolicies: WorkspaceCapabilityPolicies;
   defaultOutputLocale: "zh-CN" | "en-US";
 };
 
-type WorkspaceSummary = WorkspaceCreateInput & {
+type WorkspaceCreateState =
+  | {
+      kind: "selection_required";
+      commandId: string;
+      missingSelectionPurposes: Array<"project" | "path_grant">;
+      messageKey: string;
+    }
+  | { kind: "sending"; commandId: string }
+  | { kind: "accepted"; commandId: string }
+  | { kind: "reconciling"; commandId: string }
+  | { kind: "created"; commandId: string; workspaceId: string }
+  | { kind: "rejected"; commandId: string; code: string; messageKey: string }
+  | { kind: "conflict"; commandId: string; code: string; messageKey: string }
+  | { kind: "outcome_unknown"; commandId: string; messageKey: string };
+
+type WorkspaceSummary = {
   id: string;
+  name: string;
+  projectDirectoryLabel: string;
+  runnerProfileId: string;
+  defaultOutputLocale: "zh-CN" | "en-US";
 };
 
 type WorkspaceGateway = {
@@ -431,24 +513,38 @@ type WorkspaceGateway = {
     options?: { signal?: AbortSignal },
   ): Promise<void>;
   selectProjectDirectory(options?: { signal?: AbortSignal }): Promise<
-    | { ok: true; path: string }
+    | { ok: true; selection: NativeDirectorySelection }
+    | { ok: false; code: string; messageKey: string }
+  >;
+  selectPathGrantDirectory(
+    access: "read" | "write",
+    options?: { signal?: AbortSignal },
+  ): Promise<
+    | { ok: true; selection: NativeDirectorySelection }
     | { ok: false; code: string; messageKey: string }
   >;
   createWorkspace(
-    input: WorkspaceCreateInput,
+    input: WorkspaceCreateBridgeInput,
     options?: { signal?: AbortSignal },
-  ): Promise<
-    | { ok: true; workspaceId: string }
-    | { ok: false; code: string; messageKey: string }
-  >;
+  ): Promise<WorkspaceCreateState>;
+  reconcileWorkspaceCreate(
+    commandId: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<WorkspaceCreateState>;
   openDiagnostics?(): Promise<void>;
-  quit?(): Promise<void>;
+  requestQuit?(): Promise<void>;
 };
 ```
 
-F1 must provide a production gateway interface and an explicit unavailable implementation. A local test adapter may return deterministic data, but it must be injected and must never be used by the production entry point.
+F1 must provide a production gateway interface and an explicit unavailable implementation. The production implementation is `apps/canvas/src/runtime-gateway/electron-gateway.ts`; it consumes the frozen Preload bridge and never imports Electron APIs. A local test adapter may return deterministic opaque selections, but it must be injected and must never be used by the production entry point.
 
-On a failed create command, keep the draft and show Retry. On success, clear the transient draft, transition to `workspace_loading`, and wait for the Workspace projection. Do not optimistically claim that a Workspace exists.
+Before first dispatch, the Client allocates one immutable Domain `commandId` through the shared ID generator and durably writes a Workspace-create entry to the device Client request/recovery registry. The entry freezes non-directory form fields, current opaque selection refs, and `WorkspaceCreateState`; it contains no raw path. A Shell `requestId`, React operation ID, retry click, reload, or Main restart never allocates a replacement `commandId` for the same intent.
+
+Electron Main validates `projectSelectionRef` and every `pathGrantSelections[].selectionRef`, resolves raw paths only inside Main, and constructs the unchanged Rust Runtime `WorkspaceCreateInput`. Each selection transitions atomically from unbound to `bound(commandId)`; it can be retried/reconciled only for that command and is never valid for a new command. The bridge type is deliberately named `WorkspaceCreateBridgeInput`; it does not rename or reshape the Runtime type.
+
+Both `createWorkspace` and `reconcileWorkspaceCreate` first query the original Runtime `commandId`. If Runtime has an accepted/full payload, no raw selection is needed to observe final `workspace.created`, rejected, or conflict. If Runtime confirms `not_recorded`, the same `commandId` may retry only with valid existing or reselected refs; a new command needs new refs. Main restart invalidates in-memory refs but cannot duplicate an accepted create because query-by-commandId precedes resubmission. Main erases raw paths after accepted/full payload, keeps only a no-path bound tombstone until terminal outcome, then deletes all mappings; it persists no business state.
+
+On `selection_required`, keep all non-directory draft values and reselect only missing purposes. On `outcome_unknown`, show reconciliation and call `reconcileWorkspaceCreate(commandId)`; never submit a new command. Only terminal `created` clears the draft and transitions to `workspace_loading`; `rejected` or `conflict` preserves the form and stable command evidence. Transport accepted alone never claims that a Workspace exists.
 
 ## 9. Preferences and locale contract
 
@@ -524,7 +620,7 @@ Tasks are intentionally ordered. A task is not complete until its code, test, an
 | ID | Task | Depends on | Required result |
 |---|---|---|---|
 | F1-01 | Remove prototype entry surface | none | Old TopBar/TodoTray/Dossier/fixture switches are gone from the product entry; no compatibility wrapper remains |
-| F1-02 | Add typed root state machine | F1-01 | Boot, preference restore, backend check, error, no Workspace, loading, and ready states are explicit and tested |
+| F1-02 | Add typed root state machine | F1-01 | Boot, preference restore, backend check, Runtime reconciliation, error, no Workspace, loading, and ready states are explicit; stale content cannot bypass reconciliation |
 | F1-03 | Implement token registry and theme resolver | F1-01 | Semantic tokens, built-in themes, density, motion, contrast, and system listeners work without business-store recreation |
 | F1-04 | Implement design primitives | F1-03 | Button, IconButton, TextField, Select/Menu, SegmentedControl, Dialog/Sheet, StatusMark, and Notice have complete states |
 | F1-05 | Implement i18n resources and formatter | F1-01 | `zh-CN`/`en-US`, missing-key test, pseudo-locale helper, and `Intl` formatting are wired |
@@ -534,15 +630,15 @@ Tasks are intentionally ordered. A task is not complete until its code, test, an
 | F1-09 | Implement inspector shell | F1-07, F1-08 | Selection and Attention destinations open a stable inspector; close restores focus |
 | F1-10 | Implement Workspace creation flow | F1-04, F1-05 | Five-step validation flow with permissions, dirty-close confirmation, keyboard path, and locale expansion pass |
 | F1-11 | Implement Runner probe presentation | F1-10 | All probe statuses, retry, partial completion, and no-secret display are covered |
-| F1-12 | Implement gateway seam | F1-02, F1-10 | Production entry uses an unavailable gateway until Runtime is supplied; test adapter is injected only in tests |
+| F1-12 | Implement gateway seam | F1-02, F1-10 | Production entry uses unavailable gateway until Runtime is supplied; immutable commandId registry, create/reconcile state union and lost-response idempotency are contract-tested |
 | F1-13 | Implement settings surface | F1-03, F1-05 | Theme, density, motion, contrast, and UI locale can change independently and persist |
 | F1-14 | Add accessibility and responsive verification | F1-04, F1-07, F1-10 | Keyboard, reduced motion, forced colors, 1024/1280/1440 widths, and both locales have evidence |
 | F1-15 | Complete F1-A review package | F1-01 through F1-14 | Typecheck, lint, unit/component tests, build, screenshots, diff review, and Workbench checkpoint are recorded |
-| F1-16 | Bind platform preferences | F0 decision, F1-06 | Tauri adapter reads/writes the platform app-config directory and preserves the device-only schema |
-| F1-17 | Bind project directory selection | F0 decision, F1-10 | Native picker and path diagnostics implement the client capability without browser path workarounds |
-| F1-18 | Bind the selected Runtime gateway | F0 decision, F1-12 | Connection status, retry, diagnostics, and create command use the selected authenticated transport; no fixed port or old API route |
+| F1-16 | Bind platform preferences | F0-A3, F1-06 | Electron bridge reads/writes the platform app-config directory and preserves the device-only schema |
+| F1-17 | Bind opaque directory selection | F0-A3, F1-10 | Native picker returns source/purpose/access/expiry/immutable-commandId-bound refs; Renderer has no structured raw path |
+| F1-18 | Bind Electron Runtime gateway | F0-A3, F1-12 | `electron-gateway.ts` consumes frozen bridge; create/reconcile query original commandId, status/diagnostics/streams use typed proxy with no fixed port/bootstrap leak |
 | F1-19 | Wire desktop startup, tray, and shutdown | F1-16 through F1-18 | Closing the window keeps the supervised Runtime running in the tray; explicit quit safely pauses and exits without unowned child processes |
-| F1-20 | Complete F1-B desktop review | F1-19 | Tauri build/check, bundled-asset startup, failure/retry, preference path, directory picker, and shutdown evidence are recorded |
+| F1-20 | Complete F1-B Electron review | F1-19 | Packaged Electron security, bundled app://ensemble startup, MessagePort, opaque picker, preference path, safe quit and three-platform evidence are recorded |
 
 ### 12.1 Implementation status
 
@@ -551,7 +647,7 @@ This table is the delivery ledger for the current F1 implementation. “Complete
 | ID | Status | Evidence |
 |---|---|---|
 | F1-01 | complete | Prototype entry and fixture modules removed; production boundary test passes |
-| F1-02 | complete | Typed lifecycle model, legal transition guard, root-state tests, and AppShell lifecycle tests |
+| F1-02 | revision required | Existing lifecycle tests cover the earlier state set; `runtime_reconciling`, its legal transitions, no-stale-content surface, stable retry identity, and AppShell evidence are missing |
 | F1-03 | complete | Semantic token resolver, light/dark themes, forced contrast/motion handling, raw-color scan, and WCAG contrast tests |
 | F1-04 | complete | Button, IconButton, TextField, Select, SegmentedControl, Dialog, StatusMark, and Notice primitives; Dialog and IME tests |
 | F1-05 | complete | `zh-CN`/`en-US` catalog coverage, pseudo-locale helper, and `Intl` formatter tests |
@@ -561,49 +657,46 @@ This table is the delivery ledger for the current F1 implementation. “Complete
 | F1-09 | complete | Inspector selection/focus tests and overlay/docked screenshots |
 | F1-10 | revision required | Earlier entry flow evidence remains; permission profile, selected-path, and five-capability controls are not implemented yet |
 | F1-11 | revision required | Earlier probe evidence remains; Session + Terminal + Context package supported-Runner qualification is not implemented yet |
-| F1-12 | complete | Production unavailable gateway, injected test gateway, cancellable operations, and entry-boundary test |
+| F1-12 | revision required | Earlier seam is partial evidence; immutable Workspace-create commandId registry, reconcile method/state union, selection binding, frozen bridge, byte-credit ports and bootstrap-leak rejection require reacceptance |
 | F1-13 | complete | Preference provider tests plus [live settings switch](evidence/f1-a/settings-zh-dark-compact-1280.png) |
 | F1-14 | complete | Playwright keyboard/focus smoke, reduced-motion runs, forced-colors styling, contrast tests, both locales, and 1024/1280/1440 screenshots |
-| F1-15 | revision required | The 2026-08-18 [F1-A implementation audit](reviews/F1-A-implementation-review-2026-08-18.md) remains evidence for the shell baseline; permission selection and supported-Runner qualification require a new acceptance pass |
+| F1-15 | revision required | The 2026-08-18 [F1-A implementation audit](reviews/F1-A-implementation-review-2026-08-18.md) remains partial evidence for unchanged visuals only; Runtime reconciliation, opaque selection DTO, Electron gateway, permission selection, bootstrap-leak rejection and supported-Runner qualification require reacceptance |
 | F1-16 | pending F0 verification | Requires F0-selected platform preference location and desktop adapter |
 | F1-17 | pending F0 verification | Requires F0-selected native directory picker capability |
 | F1-18 | pending F0 verification | Requires F0-selected authenticated Runtime transport |
 | F1-19 | blocked | Requires F1-16 through F1-18 |
 | F1-20 | blocked | Requires F1-B implementation and real Windows/macOS/Linux package evidence |
 
-F1-10 and F1-11 were completed against the earlier four-step entry contract. The current five-step permission contract and the Session/Terminal Runner qualification reopen their product acceptance; existing visual and lifecycle evidence remains valid only for unchanged behavior.
+F1-02 was completed against a root lifecycle that moved directly from backend check to Workspace/error states. The mandatory `runtime_reconciling` state reopens its implementation and product acceptance. F1-10/F1-12 now also require opaque native-directory DTOs and the frozen Electron bridge; F1-11 still requires the Session/Terminal/Context Runner qualification. Prior visual evidence remains valid only for unchanged surfaces and cannot accept Electron security or transport.
 
 ### 12.2 File ownership for implementation
 
-The F1-A implementation lane owns:
+The sole current ownership source is [m6-interaction-implementation-slices.md](m6-interaction-implementation-slices.md) section 9. F1 uses these non-overlapping owners:
 
-- `apps/canvas/src/**`
-- `apps/canvas/package.json` only when a dependency is required by this spec
-- `packages/protocol/src/**` only for client-facing F1 types that are explicitly not business event/schema types
-- `docs/specs/f1-shell-design-system.md` task checkboxes and evidence links
+- F1-A Renderer owner: `apps/canvas/src/app-shell/**`, `workspace/**`, `preferences/**`, `i18n/**`, `design-system/**`, `canvas/**`, `inspector/**`, `settings/**`, and focused tests assigned by the owner table.
+- Canvas gateway owner: exactly `apps/canvas/src/runtime-gateway/electron-gateway.ts` for production bridge consumption.
+- Shared Shell protocol owner: `packages/protocol/src/shell/**` for pure typed bridge contracts and closed-schema validation; no second Shell-contract package.
+- Electron F1-B owners: the non-overlapping `apps/desktop/src/main/{lifecycle,platform,runtime-supervisor,runtime-client,ipc-router,stream-bridge,security,updater}/**`, `src/preload/**`, `test/**`, and electron-builder configuration listed in the owner table. Security exclusively constructs/configures BrowserWindow and external confirmation; Lifecycle only consumes its factory and holds references; Platform only executes already-authorized named primitives.
 
-The implementation lane must not edit:
-
-- `services/runtime/**`
-- `src-tauri/src/runtime.rs`
-- `docs/specs/m6-events-commands.md`
-- `docs/specs/m6-domain-model.md`
-- old M0-M5 specs to make tests pass
-
-The F1-B lane owns the relevant `src-tauri/**` and gateway adapter files after F0 documents the selected process and transport. Changes outside the active lane's owned set require a written reason and controller review before merge.
+F1 owners must not edit Rust Runtime Domain/Event/save/Runner contracts, old M0-M5 specs, or legacy shell code to make Electron tests pass. Shell-specific work cannot add Node business Runtime/PTY/SQLite or duplicate persistence. Changes outside the active owner's exact set require controller serialization and review.
 
 ## 13. Verification matrix
 
 | Risk | Required evidence | Failure condition |
 |---|---|---|
-| Root lifecycle | State-machine tests + startup screenshots | Stale Workspace or editable controls appear before readiness |
+| Root lifecycle | State-machine tests for every legal transition, including `runtime_reconciling`, plus startup/reconciliation screenshots | Stale Workspace or editable controls appear before reconciliation and readiness |
 | Token semantics | Theme snapshot + raw-color scan | Component reads hex or branches on theme name |
 | Preference ownership | Schema test + persisted payload inspection | Workspace, Runner secret, or Run field enters device preferences |
 | Locale separation | Two-locale screenshots + payload assertion | UI locale changes output locale or business state |
 | Form correctness | Validation and async race tests | Stale probe overwrites current selection or failed create clears input |
 | Layout | 1024/1280/1440 screenshots | Inspector permanently compresses canvas or text overflows |
 | Accessibility | Keyboard smoke + reduced-motion/forced-colors checks | Focus lost, color-only status, or motion setting ignored |
-| Runtime boundary | Gateway contract tests | Production entry uses an in-memory business store or old API route |
+| Packaged CJK IME | Windows/macOS/Linux forms + Terminal composition evidence | Enter during composition submits/sends, or compositionend duplicates text/bytes |
+| Packaged accessibility | keyboard/focus/Escape/return-focus, forced colors/high contrast, accessibility tree, Narrator/VoiceOver/Orca-equivalent | Browser/component evidence is used instead of installed-app proof |
+| Runtime boundary | Gateway/Preload contract tests plus packaged Electron evidence | Production entry uses in-memory business state, generic IPC, fixed port, bootstrap raw value or old API route |
+| Workspace create idempotency | lost-response/Main-restart tests over persisted commandId registry and Runtime query | retry allocates new commandId, selection crosses command, or duplicate Workspace appears |
+| Native directory boundary | DTO/schema/source-purpose-expiry-commandId-binding/lost-response tests | Renderer receives raw path, label becomes identity, or ref crosses window/purpose/command |
+| Electron stream boundary | exact byte-credit, ack monotonic/contiguous, budgets/cancel/stale/slow tests | frame-count grant, future/stale ack, over-credit send, lifetime cap, stale port or Main-side Terminal authorization |
 | Prototype removal | `rg` scan for fixture/debug controls + review | Old fixture selector, Stage/Edge/Bubble command, or development control remains in entry |
 
 Required commands for the lane, adjusted only for the final package manager:
@@ -615,7 +708,7 @@ pnpm build:canvas
 pnpm --filter @ensemble/canvas test -- --run
 ```
 
-Add browser screenshots or Playwright evidence for the state and layout rows above. A green build without those artifacts does not close F1.
+Add browser screenshots or Playwright evidence for state/layout rows, but browser/component evidence cannot close packaged IME/accessibility rows. F1-B requires installed Windows/macOS/Linux Electron evidence with exact Electron/Chromium/OS versions. A green build without those artifacts does not close F1.
 
 ## 14. Exit gates
 
@@ -624,14 +717,14 @@ Add browser screenshots or Playwright evidence for the state and layout rows abo
 F1-A passes only when all of the following are true:
 
 - The first screen is the new shell, not the prototype.
-- The shell can render every root state without stale business content.
+- The shell can render every root state, including Runtime reconciliation, without stale business content; only a typed reconciliation result may advance to Workspace/no-Workspace readiness.
 - Theme, density, motion, contrast, and UI locale are independent and persistent.
-- Workspace creation validates name, directory, Runner, permissions, and output locale, preserves failed input, and never claims a Backend result it did not receive.
-- The Runtime gateway is typed and replaceable; no F1 code depends on old M2-M5 routes.
+- Workspace creation validates name, opaque directory selections, Runner, permissions and output locale; Client persists immutable commandId before dispatch, lost responses reconcile the original Runtime command, and no retry can create a duplicate Workspace.
+- The Runtime gateway is typed and replaceable; production `electron-gateway.ts` consumes only the frozen bridge, and no F1 code depends on old M2-M5 routes or raw Electron IPC.
 - The canvas remains the dominant surface and the inspector is conditional.
 - `zh-CN` and `en-US` pass expansion, no mixed-language, and keyboard checks.
 - The implementation has unit/component tests, build/lint/typecheck output, and screenshots.
-- An independent audit confirms goal alignment, data ownership, architecture boundaries, and the absence of raw-color/platform/locale leakage.
+- An independent audit confirms goal alignment, data ownership, architecture boundaries, opaque directory DTOs, and absence of raw-color/platform/locale/bootstrap leakage.
 
 Passing this gate allows F1-A to merge. It does not mark F1 complete.
 
@@ -640,11 +733,12 @@ Passing this gate allows F1-A to merge. It does not mark F1 complete.
 F1 closes only after F1-A passes and F1-B also proves:
 
 - Device preferences use the platform app-config directory.
-- Project directory selection uses the native capability and returns actionable path failures.
-- Startup status and retry are driven by the Runtime shape selected in F0.
-- Production startup uses bundled frontend assets rather than a Vite server.
+- Project/path-grant selection uses opaque refs with display/access/expiry; Main alone resolves raw paths and returns actionable stable failures.
+- Startup status, Event/Terminal ports and retry are driven by the Electron+Runtime shape selected in F0, with Runtime as final business/Terminal authority.
+- Production startup uses only bundled `app://ensemble` assets rather than a Vite server or arbitrary URL/env redirect.
 - Closing the window keeps the owned Runtime, active Runs, queue, and schedules alive in the system tray.
-- Explicit quit safely pauses active work, terminates only the owned Runtime process tree, and leaves no unowned process.
-- No fixed development port, repository path, `.venv`, or old M2-M5 API route appears in the production connection path.
+- Explicit quit waits for Runtime-authored safe pause; Main terminates only the signed Rust sidecar after acknowledgement or writes marker/diagnostics on Force, never enumerating Runner children.
+- No fixed development port, repository path, `.venv`, raw path DTO, Runtime bootstrap value, generic IPC, or old M2-M5 API route appears in the production connection path.
+- Installed Windows/macOS/Linux packages pass forms/Terminal CJK IME, keyboard/focus/Escape/return-focus, forced colors/high contrast/accessibility tree, Narrator/VoiceOver/Orca-equivalent, both locales/themes/DPI and reduced motion; browser evidence cannot substitute.
 
 F1 closes the product shell and desktop connection foundation only. It does not close Backend packaging, Workflow editing, Run execution, or three-platform release.

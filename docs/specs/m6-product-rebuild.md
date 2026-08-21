@@ -1,11 +1,11 @@
 # M6 Spec — Product Rebuild
 
-**状态**：实施基线 v1（2026-08-20）
-**真源**：[../01-product.md](../01-product.md) · [../08-design-language.md](../08-design-language.md) · [../ssot/design-system.md](../ssot/design-system.md) · [../ssot/i18n.md](../ssot/i18n.md) · [../ssot/platform-adaptation.md](../ssot/platform-adaptation.md) · [m6-domain-model.md](m6-domain-model.md) · [m6-orchestration-interaction.md](m6-orchestration-interaction.md) · [m6-run-operations.md](m6-run-operations.md) · [m6-agent-session-collaboration.md](m6-agent-session-collaboration.md) · [m6-execution-workspace-security.md](m6-execution-workspace-security.md) · [m6-architecture.md](m6-architecture.md) · [m6-runner-adapter.md](m6-runner-adapter.md) · [m6-events-commands.md](m6-events-commands.md) · [m6-local-runtime-scheduling.md](m6-local-runtime-scheduling.md) · [m6-platform-packaging.md](m6-platform-packaging.md)
+**状态**：Electron生产壳实施基线（2026-08-21）· 独立审查待完成 · 实现暂停
+**真源**：[../01-product.md](../01-product.md) · [../08-design-language.md](../08-design-language.md) · [../ssot/design-system.md](../ssot/design-system.md) · [../ssot/i18n.md](../ssot/i18n.md) · [../ssot/platform-adaptation.md](../ssot/platform-adaptation.md) · [m6-domain-model.md](m6-domain-model.md) · [m6-orchestration-interaction.md](m6-orchestration-interaction.md) · [m6-run-operations.md](m6-run-operations.md) · [m6-agent-session-collaboration.md](m6-agent-session-collaboration.md) · [m6-execution-workspace-security.md](m6-execution-workspace-security.md) · [m6-architecture.md](m6-architecture.md) · [m6-runner-adapter.md](m6-runner-adapter.md) · [m6-events-commands.md](m6-events-commands.md) · [m6-local-runtime-scheduling.md](m6-local-runtime-scheduling.md) · [m6-electron-shell.md](m6-electron-shell.md) · [m6-platform-packaging.md](m6-platform-packaging.md)
 
 ## 1. 目标
 
-以 V2 产品目标重建 Ensemble。现有前端、Runtime API、持久化结构和桌面启动代码均可删除或替换，不要求兼容旧演示数据。
+以V2产品目标重建Ensemble。M0-M5旧前端、Runtime API、持久化和桌面启动代码不构成兼容约束。当前M6 Domain/Command/Event/Runtime API、持久化和save meaning已经冻结；Electron Shell迁移不得借“重建”改写这些合同。
 
 首个可验收版本必须证明：
 
@@ -31,7 +31,7 @@
 - Workspace 配置、设备偏好和 Run 快照严格分离
 - Runner 通过 Adapter 接入
 - 业务事件使用稳定 code，不发送写死语言的系统文案
-- 平台差异集中在 Tauri Shell 和 Platform Adapter
+- 平台差异集中在Electron Shell和Platform Adapter；业务执行仍集中在Rust Runtime
 - Theme 和 Locale 不进入业务组件条件分支
 
 ---
@@ -39,7 +39,7 @@
 ## 3. 建议模块边界
 
 ```text
-apps/canvas/
+apps/canvas/src/
   app-shell/
   workspace/
   orchestration/
@@ -49,20 +49,19 @@ apps/canvas/
   settings/
   design-system/
   i18n/
+  runtime-gateway/electron-gateway.ts
 
-services/runtime-rs/
-  transport/
-  domain/
-  scheduler/
-  adapters/
-  events/
-  persistence/
+apps/desktop/
+  src/main/{lifecycle,platform,runtime-supervisor,runtime-client,ipc-router,stream-bridge,security,updater}/
+  src/preload/
+  test/
+  electron-builder.yml
 
-src-tauri/
-  platform/
-  backend-runtime/
-  preferences/
-  window/
+packages/protocol/src/shell/
+  bridge / envelope / stream / directory-selection / schema
+
+crates/ensemble-runtime/
+  transport / domain / application / persistence / adapters
 ```
 
 模块名称在技术设计阶段最终确认，但职责不得重新混合。
@@ -73,7 +72,7 @@ src-tauri/
 
 | 数据 | 所有者 | 生命周期 |
 |------|--------|----------|
-| Theme、UI Locale、Density | Tauri preferences | 设备级 |
+| Theme、UI Locale、Density | Electron platform preference adapter | 设备级 |
 | Workspace path、默认 Runner、默认输出语言 | Workspace config | Workspace 级 |
 | Role、Seat、Group、Task、Transition、Gate、Join、Contract | Orchestration config | 可编辑模板 |
 | ExecutionPolicyVersion、RunLaunchSpec、ScheduleLaunchTemplate、Queue Item、Schedule、ScheduleFire | Runtime persistence | Workspace 级；策略与启动输入不可变，Schedule 配置可更新或归档 |
@@ -91,7 +90,7 @@ src-tauri/
 ### A. 首次启动
 
 1. 应用读取系统语言、主题和平台能力
-2. Tauri Shell 启动 Rust Runtime sidecar，完成认证、协议握手、账本对账和健康检查
+2. Electron Main从签名`process.resourcesPath`启动Rust Runtime sidecar，完成认证、协议握手、账本对账和健康检查；Renderer只看到脱敏状态
 3. 无 Workspace 时进入创建流程
 4. 不出现开发态 Fixture
 
@@ -217,7 +216,7 @@ Agent 派生来源、Active Seats 分组、不同 CLI 协作以及同一 Runner 
 
 ## 11. 已确认的实施门禁
 
-以下规则作为 M6 实现约束；Rust sidecar 已选定，实际能力仍由 [m6-platform-packaging.md](m6-platform-packaging.md) Spike 证明：
+以下规则作为M6实现约束；Electron Shell和Rust sidecar已选定，Shell安全边界以[m6-electron-shell.md](m6-electron-shell.md)为准，实际能力仍由[m6-platform-packaging.md](m6-platform-packaging.md) Spike证明：
 
 1. **Runner 选择**：Workspace 创建至少需要一个设备 installation 可用、且对当前 Workspace policy/required capabilities 为 qualified 的 Profile；`pi` 为默认推荐，Task/Seat 覆盖属于高级配置。首版内置 `pi`、Codex CLI 和 Claude Code Adapter，CLI 本体与原生登录由用户管理，三个 Runner 必须通过三平台九组合门槛。
 2. **Workflow 能力**：首版支持 Task、Gate、Join、并行、`all/any`、显式 End outcome、Optional skipped path 和有上限 Rework，不支持任意脚本或自由表达式；Gate 首版固定阻塞且没有第二个 `blocked` 状态。多 formal Task Workflow 必须指定 Dispatcher Task；其业务 Attempt 正常终态化，Runtime 通过该 formal AgentInstance 的 Run-scoped DispatcherCoordinationLease 选择其它 formal 实例的执行目录。没有业务 Attempt owner 时，replacement coordination Handle 通过独立 CoordinationLaunch 建立，不伪造 TaskAttempt。spawn-capable parent 通过当前 Attempt channel 选择自己 worker 的目录。

@@ -53,14 +53,16 @@ payload
 booting
   -> restoring_preferences
   -> checking_backend
+  -> runtime_reconciling
   -> no_workspace | workspace_loading | startup_error
   -> ready
 ```
 
 - `booting` 只显示启动进度，不显示旧 Fixture 或开发控件。
 - Backend 健康检查失败时，用户看到可操作的“重试”和“查看诊断”，不能进入半连接的编辑态。
+- `runtime_reconciling` 期间 Runtime command admission/business write-ready 始终关闭。Runtime 回放 Event、补齐 sequence、扫描 accepted-without-terminal-result Draft row，并把 supervisor marker、launch、delivery、Handle、claim、Attempt 与 recovery owner 持久化分类到 canonical 稳定状态；需要用户处理的项可以进入 interrupted/degraded + typed Attention，不等待用户 resolve。只有 Runtime 通过既有 health/reconciliation ready fact确认完整 classification barrier 后，Client 根才离开 `runtime_reconciling`；accepted Draft row 终态化不能单独开放 writes。
 - `no_workspace` 进入 Workspace 创建流程；已有 Workspace 时优先恢复 `lastWorkspaceId`。
-- `workspace_loading` 先显示名称、项目目录和 Draft 加载状态，避免用户误以为可以编辑未加载内容。
+- `workspace_loading` 先显示名称、项目目录和 Draft 加载状态。即使 Runtime 已全局 write-ready，该 Draft 仍只读，直到 canonical Event/Snapshot、ClientDraftRecoveryRecord、operation registry 和 accepted/sending results 完成校验/对账，corruption/orphan needs-action 已建立，全部 local batch按 FIFO 重投影/重校验且 one-promoted-command invariant 已验证。hydrated queue 原子发布后才开放该 Draft 编辑；一个 corrupt Draft 不阻塞其它 ready surface。
 
 ### 2.2 全局导航
 
@@ -74,7 +76,7 @@ workspaces | runs | attention | settings
 - 导航轨道不放 Runner 模式切换，不放大量运行按钮，不显示内部 ID。
 - 点击 Attention 入口后，系统完成 Workspace 切换、对象定位和检查器打开；如果目标 Run 已结束，打开只读历史上下文。
 - Workspace 提供 Files 入口；文件树属于 Workspace，Seat 检查器只提供 Activity、Changes 和 Artifacts 的过滤入口。
-- Active Seats 是运行实例投影，支持按 Organization、Run、Origin 和 Status 分组；派生 worker 必须显示父 AgentInstance、父 Attempt 和创建原因。
+- Active Seats 是运行实例投影，支持按 Organization、Run、Origin、Runner 和 Activity 分组；派生 worker 必须显示父 AgentInstance、父 Attempt 和创建原因。
 - 从 Attention、Seat、Task 或 Artifact 打开 Diff 时，中央区域切换为检查视图，保留来源上下文；关闭后恢复原画布位置和选择。
 
 ### 2.3 Workspace 顶部上下文
@@ -110,9 +112,10 @@ Runner 只在 Workspace 设置、节点高级配置和启动预览中出现，�
 ### 3.3 项目目录
 
 - 使用平台原生目录选择器，不让用户手写平台特定路径作为唯一入口。
-- 目录必须存在、可读；执行 Run 前还需验证可写和权限策略。
-- 显示规范化后的绝对路径，同时保留用户选择的原始路径语义，不手工替换分隔符。
-- 目录不可用时阻止下一步，并显示可操作原因：不存在、不可读、不可写或被系统拒绝。
+- Renderer只接收`selectionRef + displayName + access + expiresAt`；Workspace create使用`projectSelectionRef`与`pathGrantSelections[]`，这些Shell selection identity不是持久化FileRoot/PathGrant ref。`displayName`仅用于显示，不能作为identity、路径或完整路径tooltip。
+- Electron Main把ref绑定webContents/main frame/purpose/access/expiry/immutable Domain commandId并验证目录存在、可读；执行Run前仍由Runtime验证可写和权限策略。
+- Main解析真实路径后代理未改变的Runtime创建输入；Runtime内部保留用户选择的原始平台路径语义，不手工替换分隔符，FileRoot/PathGrant/save meaning不变。
+- 目录不可用、ref过期/已消费/来源或purpose不匹配时阻止下一步，并显示稳定、可操作原因。
 
 ### 3.4 Runner 探测与选择
 
@@ -136,11 +139,11 @@ probing | available | not_installed | installed_incompatible | missing_configura
 
 - 默认选择 `workspace_write`，允许读取和写入项目目录。
 - 用户可以切换 `read_only`、`selected_paths` 或 `full_access`。
-- `selected_paths` 使用平台原生目录选择器添加一个或多个目录，并为每项选择 read 或 write。
+- `selected_paths`使用平台原生目录选择器添加一个或多个opaque selection，并为每项选择read或write；Renderer不持有raw path，Main只为一个Runtime command解析。
 - 网络、外部进程、Workspace 外写入、破坏性命令和外部发布分别选择 `allow | ask | deny`。
 - 默认允许网络和外部进程，拒绝 Workspace 外写入，破坏性命令和外部发布需确认。
 - `full_access` 持续显示高权限标记和范围摘要，但不反复要求审批；用户可以在 Workspace 设置中收紧。
-- 目录选择和权限摘要进入创建确认页。密钥文件默认不进入搜索、附件和自动上下文。
+- 目录显示标签、access和expiry进入创建确认页，不展示结构化绝对路径。密钥文件默认不进入搜索、附件和自动上下文。
 
 完整权限与秘密规则见 [m6-execution-workspace-security.md](m6-execution-workspace-security.md)。
 
@@ -164,7 +167,7 @@ probing | available | not_installed | installed_incompatible | missing_configura
 ## 4. Workspace 恢复与切换
 
 - Workspace 列表显示名称、项目目录、最近 Run 状态和未处理 Attention 数量。
-- 切换前若当前 Draft 有未完成保存，先等待保存结果；保存失败时要求用户选择“重试保存”或“放弃本次修改”。
+- 切换 Workspace 不等待全部 Draft batch 终结。Client 先 durable flush 当前 Workspace 的 Draft recovery journal/全局 operation registry，然后立即切换；accepted command 继续由 Runtime durable ledger 按原 `commandId` 执行和对账，buffered/invalid/save_failed/conflict/unknown overlay 留在该 Workspace 的 recovery journal。flush 失败时留在当前 Workspace并提供 Retry flush、Return 或明确 Discard local-only records，accepted command 不可丢弃。
 - 切换操作不销毁其它 Workspace 的运行连接和内存状态；运行中的 Run 继续由 Runtime 执行。
 - 切换回来后先从持久化快照和事件序列恢复，再恢复上次的选择和 Viewport。选择和 Viewport 不进入业务版本。
 - 项目目录失效时仍加载 WorkspaceConfig 和 Draft，禁用启动 Run，并提供“重新绑定项目目录”；不能把目录失效误报为编排丢失。
@@ -201,8 +204,8 @@ probing | available | not_installed | installed_incompatible | missing_configura
 哪些 Workflow 路径和 Artifact Binding 会受影响
 ```
 
-- 有 Task 引用的 Seat 不能直接删除，用户必须先重新指派、禁用相关 Task 或取消操作。
-- 有 Seat 引用的 Role 不能直接删除；可以先停用 Role，或逐个处理引用。
+- 有 Task 引用的 Seat 不能直接删除，用户必须先重新指派、删除对应 Task 或取消操作。
+- 有 Seat 引用的 Role 不能直接删除；必须先逐个处理引用。首版不提供 Role 停用。
 - 删除 Group 只删除容器关系，不删除其子 Seat；必须让用户选择“移动子项到父级”或“逐项处理”。
 
 ### 5.3 检查器内容
@@ -233,7 +236,7 @@ start | task | gate | join | end
 - 新建 Gate 必须选择 `approval` 或 `question`，并配置允许动作；首版 Gate 固定为阻塞。
 - 新建 Join 必须选择 `all` 或 `any`，并连接至少两个并行来源。
 - 当 Workflow 有多个 formal Task 时，用户必须在 Workflow 设置中指定一个 Dispatcher Task。它仍是普通 Task，业务 Attempt 可以正常完成；其已启动 formal AgentInstance 通过 Runtime 签发的 Run-scoped DispatcherCoordinationLease 继续承担其它 formal Task 的目录协调。transient worker 由发起 spawn 的父 Agent 通过当前 Attempt channel 分发。
-- Dispatcher Task 必须可从 Start 到达，且不能依赖它负责分发的下游 Task。删除或禁用时必须先选择替代 Dispatcher。
+- Dispatcher Task 必须可从 Start 到达，且不能依赖它负责分发的下游 Task。删除时必须在同一 Draft 原子操作中选择替代 Dispatcher；首版不提供 Task 停用。
 - 不提供任意脚本节点、自由表达式条件或隐藏的自动化分支。
 
 ### 6.2 连接
@@ -275,7 +278,7 @@ Contract 编辑器要求：名称、媒体类型、是否必填、数量（`one`
 ### 7.1 选择模型
 
 - 单击对象选中并打开检查器；空白单击清除选择并关闭检查器。
-- `Shift` 多选只用于批量布局和启用/禁用，不允许批量修改角色指令或流程语义。
+- `Shift` 多选只用于批量布局；全部选择都是 Seat 时可以批量启用/禁用，不允许批量修改 Role 指令、Task 状态或流程语义。
 - Hover 只显示即时上下文；完整信息在检查器中显示。
 - 选择状态使用轮廓、定位标记和主信号表达，不用大面积背景遮住画布。
 
@@ -295,29 +298,42 @@ Contract 编辑器要求：名称、媒体类型、是否必填、数量（`one`
 
 ### 8.1 Draft 编辑批次
 
-- 每个成功的编辑命令立即更新内存 Draft，并进入待保存队列。
+- canonical Draft 只由 Backend snapshot 和 `orchestration.draft.applied` Event 推进。Client 不直接修改 canonical Draft；即时视觉反馈写入 presentation-only `PendingDraftOverlay`，界面始终渲染 `canonical Draft + PendingDraftOverlay`。
+- 每次本地编辑先形成 FIFO `localBatch`，只分配稳定 `localBatchId`、typed operation、受影响对象和输入缓冲引用，状态为 `buffered`。尚未 promoted 的 batch 不得预分配 `commandId`、`expectedRevision` 或 `operationDigest`；本地字段校验结果和 diagnostics 只按 `localBatchId` 保存。
+- 每个 Workspace 最多有一个 promoted request，包括 `sending | accepted | save_failed | conflict | unknown` 任一非终结状态。只有不存在 promoted request 且写入未冻结时，队列才可 promotion。
+- promotion 前，Client 必须从当前 canonical Draft 开始，按 FIFO 顺序重投影并重校验全部未发送 batch。每个通过本地校验的 batch 依次进入临时 projection；无效 batch 不进入临时 projection，继续保留在本地并显示绑定 `localBatchId` 的字段 diagnostics。完成整队重校验后，只 promotion 队列中的第一个 valid batch。
+- promotion 原子分配不可变 `commandId`、`expectedRevision=<当前 canonical revision>` 和覆盖完整 operation 的 `operationDigest`，并把该 `localBatchId` 关联到 operation/request registry。身份一旦分配不得因 Retry、重连、重新投影或对账而改变；Retry 和 reconcile 必须使用相同 command ID、revision 与 digest。
+- promoted request 的 `save_failed | conflict | unknown`、transport receipt 和 applied/rejected outcome metadata 只由按 `commandId` 索引的全局 operation/request registry 持有；registry 与 local batches/form buffer refs 一起写入设备级 Client Draft recovery journal。PendingDraftOverlay 只读取 registry 投影，不复制第二份请求真源；journal 只恢复本地工作，不是 canonical Draft。
+- Runtime 只有在完整 command identity/payload 已写入 durable command ledger 后才返回 accepted；从该时刻起即使用户离开页面或 Client 退出，Runtime 仍接管原 command。收到 matching `orchestration.draft.applied`，或权威 Snapshot 已包含相同 applied result 后，Client 才推进 canonical Draft、`revision` 与 `lastSavedAt`，再终结 registry request 并移除对应 overlay。transport accepted 不能提前显示为已保存，也不能独立推进任何 saved/dirty revision。
+- predecessor applied，或被明确 rejected/discarded 后，Client 必须先用 Event 更新或从 Backend reload canonical Draft，再按上述规则对全部 unsent batch 重新投影和重校验，保留 invalid batch 及字段 diagnostics，最后才 promotion 第一个 valid batch。
+- 明确 rejection 只移除被拒绝 request 的 overlay，不回滚其它 applied operation 或 unsent batch；表单的本地输入缓冲继续保留。用户修正后创建新的 `localBatchId`，该 batch 日后 promotion 时获得新的 command ID。
+- 任一 conflict 或 unknown 冻结当前 Workspace 的 Draft 语义写入和后续 promotion。unknown 只允许用原 command ID 对账；不能自动重发、改 command ID 重试或假定命令失败。
 - 单行文本在 Enter 或失焦时提交；多行文本使用明确的保存动作或 `Cmd/Ctrl+Enter` 提交，输入法组合期间不触发快捷键。
 - 连续布局拖动合并为一个历史操作批次；松开指针后形成一条可撤销记录。
-- 命令空闲约 250ms 后自动保存，应用退出或切换 Workspace 前必须等待队列清空。
+- 命令空闲约 250ms 后自动提升。导航、关窗到托盘和进程退出都不等待全部 batch 进入终态：导航/关窗只 durable flush recovery journal；正常进程退出也只等待该 flush，再进入 Runtime 安全退出。unknown/conflict 保留原 command/overlay、冻结所属 Workspace 的写入和 promotion，并在全局 Attention surface 恢复由 operation registry 投影的 Draft needs-action entry；不要求无法达到的空队列。
 
 ### 8.2 保存状态
 
 顶部显示以下稳定状态：
 
 ```text
-saved | saving | save_failed | conflict
+saved | buffered | saving | accepted_waiting_event | save_failed | conflict | outcome_unknown
 ```
 
-- `save_failed` 不丢弃内存 Draft，提供重试；离开 Workspace 时必须明确处理。
-- `conflict` 表示 `expectedRevision` 不匹配。首版不做静默合并，提供“重新加载已保存版本”和“保留当前修改为模板”两个明确动作。
-- 重新加载会丢弃当前内存 Draft，必须二次确认；保留副本生成新的 Template，不覆盖冲突版本。
-- 自动保存不创建 OrchestrationVersion；版本只在启动 Run、保存 Template 或用户显式创建时产生。
+- 顶部状态由 canonical revision 和全部 overlay item 派生；`accepted_waiting_event` 仍不是 saved。多个 item 并存时，优先级为 `outcome_unknown > conflict > save_failed > saving > accepted_waiting_event > buffered > saved`。
+- `save_failed` 保留 canonical Draft、其它 overlay、unsent batch 和表单输入，只提供 **Retry** 与 **Discard**。Retry 使用 registry 中原 command ID/revision/digest 恢复同一提交；Discard 明确终结该 request并移除对应 overlay，随后 reload/reproject 队列，不清空整份 Draft、unsent batch 或表单字段。
+- `conflict` 表示 `expectedRevision` 不匹配。首版不静默合并；固定动作严格是 **Reload**、**Review** 和 **Reapply**。Reload 获取 latest canonical Draft并在确认后终结冲突 request。Review 加载 latest canonical，只读对照仍完整保留的旧 conflict record、operations 和 form buffers。Reapply 在旧记录仍存在时完成确认，再用一个 crash-safe atomic Client journal revision 创建全新 `localBatchId`、转移 operations/buffers 到无 command identity 的 `LocalDraftBatch`，并同时删除旧 local refs；crash 只能恢复完整旧记录或完整新 batch。新 batch 后续才按正常 promotion 获得新的 command ID/revision/digest，原 command 永不修改或重放。
+- `outcome_unknown` 保留 overlay 并将 Draft 置为只读，直到原 command 对账为 applied 或 rejected/conflict；离开 Workspace或重启后都从全局 registry/recovery journal 恢复未完成对账，不能把 overlay 当作已保存数据。`conflict` 同样恢复冻结和 Reload/Review/Reapply 三个动作。
+- 自动保存不创建 OrchestrationVersion；版本只在启动 Run 或用户执行明确的版本创建动作时产生。
 
 ### 8.3 撤销与重做
 
-- 撤销和重做只作用于当前 Draft 的成功命令，不反向修改已经启动的 Run。
+- 对尚处于 `buffered`、从未发送的 operation，Undo 只移除对应 `localBatchId` 和 overlay，不发送 Domain Command 或创建 Event；随后按 FIFO 重新投影、重校验其余 unsent batch。
+- `sending | accepted | save_failed | conflict | unknown` operation 不能通过本地 Undo 消失；必须先等待 applied、执行对应 Retry/Discard/Reload/Reapply，或完成原命令对账。
+- 已由 `orchestration.draft.applied` 推进 canonical Draft 的 operation，Undo 必须创建包含 inverse operation 的新 `localBatchId`；它按正常队列 promotion 后获得新 command ID 和当时最新 expected revision。只有 inverse 的 applied Event 才推进 canonical Draft。Redo 同样创建新的正向 local batch，不在 Client 内改写历史 revision。
+- 撤销和重做不反向修改已经启动的 Run。
 - 保存成功不会清空历史栈；切换 Workspace 时各自保留独立历史，进程重启后历史栈可以丢失。
-- 删除、移动归属、批量禁用和 Contract 语义修改均必须作为单条可撤销命令。
+- 删除、移动归属、Seat 批量禁用和 Contract/Binding 语义修改均必须作为单条可撤销命令。
 
 ## 9. 校验与错误定位
 
@@ -399,10 +415,10 @@ blocking warnings/errors
 
 ### 10.4 Agent Session 与 Terminal
 
-- 点击 Active Seats 中的 AgentInstance 或运行画布中的活动 Seat，中央区域打开该实例的 Session。
+- 点击 Active Seats 中的 AgentInstance 打开精确实例；点击 Seat 打开长期 Session 聚合。Seat 同时有多个当前实例时先显示实例选择器，不能自动选择最近实例。
 - Session 展示对话、结构化 Activity、当前 Task/Attempt、运行控制、Changes、Artifact 和 Attention；不是终端文本的美化副本。
 - Terminal 在同一位置作为另一个视图，连接同一个 AgentInstance 和 Runner process handle，支持 CLI 原生 ANSI、键盘、选择器和 `/` 命令。
-- Session 与 Terminal 切换不能重启 CLI 或创建新 Attempt。Terminal 接管键盘时，Session 不得同时向同一 PTY 写入。
+- Session 与 Terminal 切换不能重启 CLI 或创建新 Attempt。Terminal 通过 Runtime input-owner lease 接管键盘时，Session 不得同时向同一 PTY 写入；retained Terminal 固定只读。
 - Ensemble 首版不提供 CLI slash command 推荐或自动发现；Runner 原生命令只在 Terminal 中呈现。
 - Session 消息的实时投递受 Runner capability 约束；不支持时明确进入下一次 Attempt，不能显示为当前实例已接收。
 - Session 是长期 Seat 入口，可以跨多个 Direct Task/Run 自由对话；每条消息仍显示并绑定当前 Task/Run。
@@ -422,16 +438,18 @@ Create schedule
 ```
 
 - **Add to queue** 将当前启动预览的编排版本、输入、Runner Profile 绑定、transient Profile allow-list、输出语言和 ExecutionPolicyVersion 冻结为 RunLaunchSpec，再创建持久化队列项；关闭窗口后仍可启动。
-- **Create schedule** 打开轻量设置面板。Cron 使用五字段、分钟粒度表达式和 IANA timezone；Interval 使用至少 60 秒的间隔与 UTC anchor。面板同时包含错过执行策略、重叠策略和后台预授权摘要。
+- **Create schedule** 打开轻量设置面板，先填写必填名称。Cron 使用五字段、分钟粒度表达式和 IANA timezone；Interval 使用至少 60 秒的间隔与 UTC anchor。面板同时包含错过执行策略、重叠策略和后台预授权摘要；未来 occurrence 由 Runtime 预览，Client 不自行解释 Cron/DST。
 - 默认错过执行策略为“只补最新一次”，默认重叠策略为“保留最新一个待运行项”。高级设置可以选择跳过、全部补跑或允许并行，并显示补跑上限。
 - 计划只能引用刚创建或已经保存的 OrchestrationVersion。Draft 后续修改不会静默改变计划；用户需要显式更新计划到新版本。
 - 创建计划时把编排版本、输入、Runner Profile 绑定和非敏感配置、输出语言及不可变 ExecutionPolicyVersion 冻结为 ScheduleLaunchTemplate。Workspace 默认值后续变化不会静默改变计划；收紧 Workspace policy 仍会在触发时限制旧计划。
 - 权限面板只允许等于或收紧 Workspace policy，并保存带 digest 的 ExecutionPolicyVersion。增加目录、网络、外部进程、破坏性命令或外部发布权限时，需要用户显式确认并创建新的 policy version 和 ScheduleLaunchTemplate。
 - 首版不显示文件变化、Webhook 或 API 触发选项。
 
-Runs 视图提供 **Queue** 和 **Schedules** 两个标签。Queue 可以查看来源、冻结版本、等待原因，并对尚未创建 Run 的项调整顺序或取消；Schedules 可以查看下一次运行、上次结果、来源版本和阻塞原因，执行启用、禁用、立即运行、编辑和归档。归档停止未来触发，但保留计划、已经创建的队列项、Run 和历史 fire。
+Runs 视图提供 **Queue** 和 **Schedules** 两个标签。Queue 可以查看来源、冻结版本和等待原因；只有单一 Workspace、未过滤列表中的 `queued` 项可重排，`queued | preparing | blocked` 可取消。Schedules 通过 Runtime `ScheduleListProjection` 查看名称、下一次运行、上次 occurrence、来源版本和阻塞原因，执行启用、禁用、立即运行、编辑和归档。归档停止未来触发，但保留计划、已经创建的队列项、Run 和历史 fire。
 
-关闭主窗口时应用进入托盘，画布状态落盘但 Run 不暂停。首版托盘只提供 **Open Ensemble** 和 **Quit Ensemble**；Pause/Resume 在具体 Run 中操作。有活动 Run 时选择 Quit 显示摘要，默认 **Pause safely and quit**。只有 Runtime 确认安全暂停的 Run 才设置 `resumeOnStartup=false`；强制终止、系统注销、关机或异常中断的 Run 按风险恢复策略处理。
+关闭主窗口时应用先 durable flush Draft recovery journal/全局 operation registry，再进入托盘；不等待 accepted command 产生 Event，也不要求全部 Draft batch 终结。画布状态落盘但 Run 不暂停。首版托盘只提供 **Open Ensemble** 和 **Quit Ensemble**；Pause/Resume 在具体 Run 中操作。有活动 Run 时选择 Quit 显示摘要，默认 **Pause safely and quit**。只有 Runtime 确认安全暂停的 Run 才设置 `resumeOnStartup=false`；强制终止、系统注销、关机或异常中断的 Run 按风险恢复策略处理。
+
+托盘 **Quit Ensemble** 在 journal flush 后建立 sidecar-wide command-admission fence，停止接受新 Domain command；Runtime 必须把 durable ledger 中每条 already-accepted Draft command 用原 identity/payload 排空或对账为 canonical applied/rejected/conflict，再与全部 Run shutdown barrier 一起返回 safe acknowledgement。没有 active Run 也执行该 drain。30秒内任一accepted command或Run未收敛时只允许Continue waiting / Force quit；Force quit时Electron Main只写supervisor marker/脱敏诊断并终止owned Rust sidecar，不枚举/kill/reclassify Runner child；下次`runtime_reconciling`在write-ready前处理原ledger row。
 
 后台产生 Attention 时发送脱敏系统通知。点击通知必须按 scope 直接打开对应 Workspace、Run 或 Queue Item，以及 Attention；没有 Client 连接时，审批保持等待，不自动批准或拒绝。
 
@@ -443,8 +461,10 @@ Runs 视图提供 **Queue** 和 **Schedules** 两个标签。Queue 可以查看�
 | 空组织 | 组织视图显示一个新建入口 | 新建 Role、Seat 或 Group |
 | 空流程 | 流程视图显示 Start 到 Succeeded End 骨架 | 新建 Task 或套用模板 |
 | 加载中 | 保留导航上下文，不显示假数据 | 取消加载（若支持）、重试 |
-| Runtime 不可用 | 组织和 Draft 仍可编辑 | 重试连接、查看诊断，启动按钮禁用 |
-| 保存失败 | 保留内存修改并固定提示 | 重试、另存副本、放弃修改 |
+| Runtime 不可用 | 保留最后投影并明确 stale，组织和 Draft 只读 | 重试连接、查看诊断；所有语义写入和启动禁用 |
+| 保存失败 | 保留 canonical Draft、PendingDraftOverlay 和表单输入并固定提示 | Retry、Discard |
+| Draft conflict | 冻结语义写入并保留冲突 overlay | Reload、Review、Reapply |
+| Draft outcome unknown | 保留 overlay、Draft 只读，等待原 command 对账 | 重新连接、继续对账、查看诊断 |
 | 校验失败 | 定位错误对象 | 修复、查看影响 |
 
 错误文案使用 `message_key` 和参数，不能把内部异常堆栈直接放在主工作面；详细诊断进入 Inspect。
@@ -469,6 +489,7 @@ Runs 视图提供 **Queue** 和 **Schedules** 两个标签。Queue 可以查看�
 | `Esc` | 按层级退出 |
 
 - macOS 使用 `Cmd`，Windows/Linux 使用 `Ctrl`；输入框和 IME 组合期间不拦截文本编辑快捷键。
+- Terminal 持有 input-owner lease 时，普通按键、`Esc`、Ctrl-C 和 CLI slash command 由 Terminal 优先处理；全局切换快捷键只在 Terminal 未持有输入权时生效。释放输入使用平台层明确配置的逃生动作。
 - 所有画布对象、图标按钮和状态提示必须有可访问名称；状态不能只靠颜色表达。
 - 键盘焦点进入画布后可按对象顺序移动，进入检查器后焦点不跳回画布。
 - 减少动态模式下禁用路径位移，只保留必要的颜色或透明度反馈。
@@ -479,6 +500,7 @@ Runs 视图提供 **Queue** 和 **Schedules** 两个标签。Queue 可以查看�
 - 创建 Workspace 必须完成项目目录、可用 Runner 和默认输出语言三项配置。
 - 组织拖动不会改变父子关系；流程连接不会偷偷改变组织结构。
 - 一个 Draft 的编辑、撤销、自动保存、冲突和重新加载有可观察状态。
+- 连续建立多个本地 Draft batch 时，未 promotion 的 batch 没有 command identity，每个 Workspace 同时最多一个 promoted request；每次 canonical 前进或 predecessor 明确终结后都按 FIFO 重投影和重校验，invalid batch 保留字段 diagnostics，Retry/reconcile 不改变已分配身份。
 - 有阻塞校验错误时，启动动作不会创建 RunSnapshot。
 - 启动后修改 Workspace 默认 Runner、UI Locale 或 Draft 不影响已启动 Run。
 - `zh-CN`、`en-US`、浅色、深色、减少动态和高 DPI 下，控件结构和操作位置保持稳定。
@@ -486,6 +508,8 @@ Runs 视图提供 **Queue** 和 **Schedules** 两个标签。Queue 可以查看�
 - 三种执行目录、四种权限档位、派生审批、实例预算和恢复代次均能在启动前查看并配置。
 - 用户能把不可变编排版本加入持久化队列或创建计划，并明确看到时区、补跑、重叠和后台预授权。
 - 关闭窗口后 Run 和计划继续；托盘显式退出与系统注销/崩溃使用不同的自动恢复语义。
+- accepted Draft command 在普通导航后继续由 Runtime durable ledger处理；graceful quit 建立 admission fence并等待全部 accepted row canonical 收敛，force quit/crash 后在 write-ready 前按原 commandId/payload 重放。正常重启恢复 local overlay 和 unknown/conflict needs-action，saved revision 仍只随 matching Event/Snapshot推进。
+- startup accepted-row 子屏障完成但其它 Runtime subject 未分类时，Client 根保持 `runtime_reconciling`。Runtime 全局 ready 后，每个 Draft 仍完成 canonical/journal/registry/result/FIFO hydration 才开放编辑；新输入不能越过恢复队列或创建第二个 promoted command。
 
 ## 14. 实施约束
 
@@ -494,4 +518,4 @@ Runs 视图提供 **Queue** 和 **Schedules** 两个标签。Queue 可以查看�
 1. Runner 探测不到任何可用 Profile 时，阻止完成 Workspace 创建。
 2. 组织父子关系必须使用明确“移动归属”命令，画布拖动只改布局。
 3. Draft 自动保存，启动 Run 自动创建不可变版本和 Snapshot。
-4. 首版冲突不做静默合并，只提供重新加载或保留副本。
+4. 首版冲突不做静默合并，合法动作严格为 Reload、Review 和 Reapply。

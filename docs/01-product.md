@@ -101,6 +101,7 @@ Ensemble 是一款面向开发者和技术负责人的跨平台 Agent 编排桌�
 - 分发 Agent 可以为每项工作选择共享目录、独立 Git worktree 或临时隔离目录
 - 多 Task Workflow 明确指定负责分发的 Task/Seat，不由 Runtime 猜测谁是负责人
 - Agent 可以按策略派生 worker；默认自动批准，同时受可配置的并发、深度和总数预算限制
+- transient worker 由父 Attempt 监督并回传结果，不自动获得 Task ownership；跨 Task/Seat 的责任转移必须创建正式 Handoff，活动 Task 换 owner 必须经过 Amendment/Rework
 
 Ensemble 不是任意流程图工具。每个编排元素都必须回答：
 
@@ -139,6 +140,7 @@ Workspace 有默认 Runner Profile，Seat 可以覆盖。Profile 可以选择可
 - UI 语言和 Agent 输出语言分别配置
 - Workspace 提供本地文件树、Diff 和交付结果预览；Agent 详情只过滤其可靠关联的变更，不拥有独立文件树
 - Active Seats 支持按组织、Run、派生来源和状态分组，并能追溯 Agent Instance 的父实例、父 Attempt 和创建原因
+- Agent 活动统一投影为 `working | blocked | done | idle | unknown`；业务 outcome 和 Run health 分开展示，无法可靠判断时不猜测
 - 每个 Agent Instance 提供 Session 与 Terminal 两种视图；两者连接同一 Runner 进程，切换不会重新启动 CLI
 - Session 只提供 Ensemble 基础对话、状态、控制和证据入口；CLI 自己的 `/` 命令和全屏交互保留在 Terminal，不维护 Runner 命令推荐镜像
 - 不同 Runner 通过 Runtime 持久化的 Task、交接记录、交付结果和上下文包协作；看板只投影状态，不充当上下文传输协议
@@ -147,6 +149,12 @@ Workspace 有默认 Runner Profile，Seat 可以覆盖。Profile 可以选择可
 - Workspace 支持只读、Workspace 可写、指定目录和完全权限四个档位，并分别控制网络、外部进程、外部写入、破坏性命令和对外发布
 - 分发 Agent 选择共享目录、独立 Git worktree 或临时目录，Runtime 校验并记录选择；冲突进入检查，不静默覆盖
 - worktree 和临时目录结果默认先检查再应用，也可配置为验证通过且无冲突时自动应用，或只保留供手动处理
+- Git 或非 Git 项目根都可作为 shared Workspace；新 worker 不隐式创建 worktree
+- Diff 支持固定到不可变 Change Set 的行内评论和 Review thread，选中反馈可以直接创建结构化 Rework；不提供代码编辑、Stage 或 Commit
+- Attempt 的完成回执结构化引用候选交付、Change Set、验证和未解决事项；summary 只用于描述
+- Attempt 收敛后 Handle 必须明确复用、只读留作检查或释放；留存继续占用容量，不能承载新业务工作
+- 长时间无完成回执只触发检查或 Attention，不自动判失败；heartbeat 和持续输出只表示存活
+- UI 重开、Conversation 重载、live process、Terminal transcript 和 business operation 恢复分别声明，不用“会话恢复”笼统代替
 
 完整规则见 [08-design-language.md](08-design-language.md)。
 
@@ -164,6 +172,7 @@ Workspace 有默认 Runner Profile，Seat 可以覆盖。Profile 可以选择可
 - 首版不安装系统级服务；显式退出、注销或关机会停止 Runtime。默认随用户登录启动并按恢复策略处理未完成工作，用户可以关闭自动启动
 - 定时计划支持 `cron | interval`，错过执行默认只补最新一次；首版不做文件监听、Webhook 或外部 API 触发
 - 后台遇到未预授权操作时暂停并通知，不自动扩大权限
+- Client detach/关窗到托盘不改变业务状态；Runtime graceful exit、crash/OS shutdown、Runner 原生 session resume 和 transcript replay 使用不同恢复合同
 
 ### 8.2 前后端可重做
 
@@ -205,12 +214,15 @@ Workspace 有默认 Runner Profile，Seat 可以覆盖。Profile 可以选择可
 - 用户能从 Agent、Run 或 Attention 直接打开对应变更、文件行和交付结果，并看见明确 Diff 基线
 - 用户能查看任意 Agent Instance 的派生来源，在同一实例的 Session 与原样 Terminal 之间切换，并直接发送符合 Runner capability 的消息或补充指令
 - 用户能在长期 Session 中跨多个 Direct Task/Run 对话、附加文件或 Diff，并搜索、导出和恢复记录
+- 用户能看见五态 Agent activity，并能区分 activity、Task outcome 和 Run health；heuristic 不会改变业务状态
 - 用户能查看并配置执行目录、派生预算、权限档位和指定目录；Runtime 不会静默扩大授权
 - 用户能在明确目标基线下检查、应用或拒绝隔离结果；冲突和 partial 变更不能伪装成完整交付
+- 用户能在冻结 Diff 上评论，并从选中评论创建可追溯 Rework；后续评论不会改变已启动 Attempt 的上下文
 - 用户能审批、打回、补充指令和重试
 - 编排模板可保存和复用
 - 用户能把不可变编排版本加入队列或定时计划，查看补跑、重叠、阻塞和来源记录
 - 关闭窗口后工作继续；显式退出和系统重启后不会重复已完成工作或静默重试状态不明的副作用
+- 长时间运行、Handle 留存和恢复都继续遵守原权限、容量和结构化证据边界
 
 体验：
 

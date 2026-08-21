@@ -1,6 +1,6 @@
 # Design System SSoT
 
-**状态**：V2 已确认；F1-A 语义 Token 与基础控件已实现，F1-B 平台绑定待 Backend 决策（2026-08-18）
+**状态**：V2视觉合同已确认；既有F1-A视觉证据仅覆盖未变化范围，Renderer重新验收与F1-B Electron平台绑定待实现（2026-08-21）
 **配合**：[../08-design-language.md](../08-design-language.md) · [i18n.md](i18n.md) · [platform-adaptation.md](platform-adaptation.md)
 
 ## 1. 目标
@@ -255,7 +255,7 @@ duration.fast
 
 - Theme 通过根节点属性和 CSS Variables 注入
 - 业务组件禁止判断 `theme === "dark"`
-- 平台差异通过壳层能力和根属性处理，不散落在组件中
+- 平台差异通过Electron frozen bridge提供的公开壳层能力和根属性处理，不散落在组件中；设计系统不接收Runtime bootstrap值或结构化raw path
 - 所有新增视觉值先判断是否属于现有 Token
 - 主题切换不得重新创建业务 Store 或丢失画布状态
 - 用户偏好写入平台应用配置目录
@@ -271,4 +271,5 @@ duration.fast
 - 键盘 Focus 全流程可见
 - `prefers-reduced-motion` 生效
 - `forced-colors` 下主要操作和状态可辨认
-- 自定义主题缺失必填 Token 时拒绝加载并指出具体字段
+- 自定义主题缺失必填Token时拒绝加载并指出具体字段
+- Windows/macOS/Linux installed Electron验证forms与Terminal CJK IME composition（composition中Enter不提交/发送，compositionend不重复）、keyboard/focus/Escape/return-focus、forced colors/high contrast/accessibility tree、Narrator/VoiceOver/Orca-equivalent、两种locale/theme、DPI和reduced motion；browser/component证据不能替代

@@ -100,4 +100,4 @@ python -c "from ensemble_runtime.crew import project_org_to_crew; ..."
 - 技术架构：[specs/m6-architecture.md](../specs/m6-architecture.md)
 - 计划：`docs/12-dev-plan.md`  
 - 历史决策：D002 / D002a / D017 / D022；覆盖决策：D026
-- Spec：`docs/specs/m3-runtime-single-agent.md` · `m4-tauri-pi.md`  
+- 历史 Spec：`docs/specs/m3-runtime-single-agent.md` · `m4-tauri-pi.md`；不定义当前 Electron/Rust Runtime 所有权

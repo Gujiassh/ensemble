@@ -85,7 +85,7 @@ healthy | needs_attention | degraded
 ```
 
 - 有未解决的 blocking Attention 时为 `needs_attention`。
-- Runner 不可用、事件连接断开或恢复未完成时为 `degraded`。
+- `degraded` 只由 Runtime 的 canonical 运行证据产生，例如必需 Runner Handle 或结构化 signal/control channel 不可用、恢复/对账未完成，或资源清理仍为 Unknown。Client 的业务 Event stream 断开只把该 Client projection 标记为 stale/offline，不能写回或派生改变 Run health。
 - UI 的“等待你处理”来自健康状态和 Attention，不把界面提示文字当作新的 Run canonical 状态。
 
 ## 3. TaskExecution、TaskAttempt 与 NodeExecution 状态机
@@ -138,7 +138,8 @@ paused -> running | canceled | interrupted
 - `skipped` 只允许 Snapshot 中 `optional=true` 的 Task。`continue_optional` 可以在 Runner 失败信号尚未提交 failed 终态时执行 `starting | running -> skipped`；人工 `skip_optional` 执行 `waiting_attention -> skipped`。已进入 `failed` 的 Attempt 不可改写，Retry 必须创建新 Attempt。
 - `waiting_attention` 表示当前 Attempt 被一个或多个 Attention 阻塞。Run 为 `running` 时，Resolve 后才可回到 `running` 或进入 `failed`；Run 为 `paused | resuming` 时 TaskAttempt 始终保持单一 `waiting_attention` status，只有对应 AgentInstance/Handle 进入 paused。Resolution 只记录为 deferred，不得提前唤醒 Runner。
 - `paused` 只在 Run 暂停边界确认后出现；Runner 不支持 `pauseResume` 时，活动 Attempt 保持 `running`，直到自然结束再暂停 Run。RecoveryCheckpoint 能力不能替代同一 Handle 的 pause/resume acknowledgement。
-- `succeeded`、`failed`、`canceled`、`skipped`、`interrupted` 的 Attempt 不再改变；重试或恢复必须创建新 Attempt。
+- `succeeded` 只有在 matching RunnerResult 的 completion receipt 通过 Task Artifact Contract 后可达。Runtime 必须先持久化 structured signal 对应的 ArtifactCandidate 和 `agent.artifact_candidate.recorded`，再持久化引用该 candidate 的 RunnerResult 和 `agent.runner.result.created`，随后完成 Contract validation 并创建正式 Artifact/`artifact.created`，最后才允许 Attempt 与 TaskExecution 进入 succeeded；缺失、冲突或无效 candidate 不能推进状态。summary、heartbeat、持续输出和 timeout 不足以证明成功，typed termination evidence 只证明进程状态，不自动决定 Attempt outcome。
+- `succeeded`、`failed`、`canceled`、`skipped`、`interrupted` 的 Attempt 不再改变；重试或恢复必须创建新 Attempt。每个拥有 registered Handle 的 settled Attempt 还必须创建一条不可变 RunnerHandleDispositionRecord，明确 `reuse | retain | release`；从未创建 Handle 的 Attempt 不伪造记录，registration 只投影最新记录。
 
 ### 3.3 End、Gate 和 Join
 
@@ -192,6 +193,8 @@ End NodeExecution 的 `nodeId` 必须引用带显式 `outcome=succeeded | failed
 10. 调度器在每次状态变更后重新计算可运行集合，重复命令不会重复派发。
 11. Run 只有在显式 End outcome 规则满足、所有已激活 TaskExecution、已启动 Attempt 和 AgentInstance 进入终态、WorkerResult/Change Set 已冻结且 ExecutionWorkspaceAssignment 已释放后才能结束；`any` Join 的迟到分支或 transient worker 不能在后台留下未归档工作或继续副作用。
 
+Task 的 `longWaitPolicy` 只产生 observation checkpoint 或 `kind=long_wait` Attention。到达 checkpoint 后，Runtime 可以查询原 Handle/Attempt、刷新 activity 或提示用户继续等待/检查；Attention 只开放 `keep_waiting | reconcile`，不能开放 Retry、Skip 或 Fail。任何检查点都不能设置 failed/canceled、创建 replacement、释放 capacity 或改变 owner。只要仍有可靠 liveness 且用户未执行明确取消，Runtime 就继续等待结构化 completion；liveness 不明时进入 `unknown`，不是 timeout failure。
+
 根 Dispatcher 的普通业务 Attempt 在 prepare 前由 Runtime 原子创建 pending DispatcherCoordinationLease，并通过 RunRequest 投递 dormant coordination channel ref；reliable Handle commit receipt 落盘后才执行 `pending -> active` 并启用 token。Dispatcher Attempt 可以按普通 success Transition 终态化；后续 formal Task 目录请求只使用 lease-scoped coordination channel，不复用已经失效的 Attempt token。active lease 阻止该 Handle 进入普通 idle stop。Handle generation、Grant、资格或 Run 生命周期变化时先 revoke；replacement Handle 必须预分配更高 generation 的新 lease，旧 request unknown 不自动重投。
 
 Agent 派生 transient worker 时，通过绑定 Runner Handle 的结构化 `spawn_request` 进入 Runtime。Runtime 必须先创建 canonical SpawnRequest，冻结父 AgentInstance/Attempt、source signal/command、reason、Runner Profile 请求、执行目录建议、requested context refs、worker output contract、workspace scope 和 request digest，再追加请求事件。Profile 省略时继承父实例，显式指定时只能使用 RunSnapshot 允许且满足 capability 的稳定 ref；不可用时 blocked，不选择“第一个可用”。`auto | ask | deny`、并发、深度和 Run 总数通过后，固定链路为：原子预留 capacity 并创建绑定 `spawnRequestId` 的 transient AgentInstance -> 创建父 Grant 与 RunSnapshot 交集的独立 PermissionGrant -> 创建并向父 Handle投递绑定 request/digest 的 ExecutionWorkspaceSelectionRequest -> 接收结构化 selection -> 创建独立 ExecutionWorkspaceAssignment -> 创建绑定 SpawnRequest 的 worker ContextPackage/AttemptLaunch -> Adapter 两阶段 prepare/commit。可靠 LaunchReceipt 后追加 `agent.context.delivered` 并把 SpawnRequest 置为 launched。选择、Context 或启动失败时终态化 worker、释放资源和 capacity reservation，并把同一 SpawnRequest 置为 failed；unknown 保持 blocked + typed Attention，不改绑父 Attempt。`requestedWorkspaceMode` 只是进入 SelectionRequest 的建议，不能越过 request/response 关联与目录校验。spawn-capable 父 Runner 必须同时具备 `transientSpawn`、`workspaceDispatch` 和 request dedupe。worker 仍由父 Attempt 承担业务责任；需要独立负责 Workflow Task 时必须先完成 Run Amendment。
@@ -231,7 +234,7 @@ End 到达或 fatal failure 决定 Run 终态时进入 Run-finalization barrier�
 
 - Resume 只对 `paused` 有效，使用以下受控屏障；已完成 Attempt 不重跑。
 - Runtime 先在一个事务内把 Run 置为 `resuming`、设置 `resumeOnStartup=true`，并在 `run.status.changed` payload 冻结有序的目标 Attempt/AgentInstance/coordination lease/TaskExecution refs 及 `live_handle | restart_from_safe_boundary | restart_coordination | continue_pre_attempt | deferred_attention_resolution` 类型。调度器保持停止；之后才允许调用任何 Adapter。
-- `live_handle` 按冻结顺序调用 `resume(handle)`；每个 acknowledgement 只追加对应 `agent.instance.status.changed(running)`。普通 paused Attempt 的全部必需 Handle 成功后，分别只追加一次 Attempt 与 TaskExecution 的 running status Event。未解决的 waiting_attention Attempt 不恢复 Handle、不改变 TaskExecution status；已解决的 deferred resolution 先恢复所需 Handle并投递 resolution，再合法执行 `waiting_attention -> running | failed`，并分别记录两类 status Event。`restart_from_safe_boundary` 必须验证 `shutdownRecoveryPlanId`，按 plan 的 recoverable Attempt 顺序冻结该 Attempt 的全部 shutdown Handle/Launch records 和 operation。Runtime 预分配 ID，并在第一个事务幂等确认旧 Attempt 已终态化为 `interrupted/safe_shutdown_process_closed`、旧 AgentInstance 已 stopped、`currentAttemptId` 已清除，再把原 TaskExecution 以 `pendingAttemptKind=recovery`、`pendingFromAttemptId` 和 Resume `pendingCommandId` 从 `paused | interrupted` 置为 provisioning。统一 pre-Attempt pipeline 随后重新占用 capacity，并为 replacement primary 建立独立 Grant/assignment；全部必需 assignment 就绪后，创建唯一 recovery Attempt、primary ContextPackage、AttemptLaunch 和 claim，清除 pending 字段，再按原父子关系为需要继续的 transient Handle 建立新 worker AgentInstance、独立 grant/assignment、worker ContextPackage 和 AttemptLaunch。每个新实例的 recovery refs 指向对应旧实例，来源授权只作校验输入。事务提交后按冻结顺序执行 `prepare_attempt_launch`，持久化每个 prepared receipt 和 `agent.attempt.launch.prepared` 后才追加对应 `agent.context.delivered`，再执行 `commit_attempt_launch`；只有全部必需 LaunchReceipt 可靠落盘并追加 `agent.attempt.launch.committed` 后，replacement AgentInstance、recovery Attempt 和 TaskExecution 才进入 running。Unknown 只能查询原 launch ID 或进入 interrupted/Attention。不能要求已销毁的旧 Handle、复用旧授权或为同一 source Attempt 创建多个 recovery Attempt。
+- `live_handle` 按冻结顺序调用 `resume(handle)`；每个 acknowledgement 只追加对应 `agent.instance.status.changed(running)`。普通 paused Attempt 的全部必需 Handle 成功后，分别只追加一次 Attempt 与 TaskExecution 的 running status Event。未解决的 waiting_attention Attempt 不恢复 Handle、不改变 TaskExecution status；已解决的 deferred resolution 先恢复所需 Handle并投递 resolution，再合法执行 `waiting_attention -> running | failed`，并分别记录两类 status Event。`restart_from_safe_boundary` 必须验证 `shutdownRecoveryPlanId`，按 plan 的 recoverable Attempt 顺序冻结该 Attempt 的全部 shutdown Handle/Launch records 和 operation。Runtime 预分配 ID，并在第一个事务幂等确认旧 Attempt 已终态化为 `interrupted/safe_shutdown_process_closed`、旧 AgentInstance 已 stopped、`currentAttemptId` 已清除，再把原 TaskExecution 以 `pendingAttemptKind=recovery`、`pendingFromAttemptId` 和 Resume `pendingCommandId` 从 `paused | interrupted` 置为 provisioning。统一 pre-Attempt pipeline 随后重新占用 capacity，并为 replacement primary 建立独立 Grant/assignment；全部必需 assignment 就绪后，创建唯一 recovery Attempt、primary ContextPackage、AttemptLaunch 和 claim，清除 pending 字段，再按原父子关系为需要继续的 transient Handle 建立新 worker AgentInstance、独立 grant/assignment、worker ContextPackage 和 AttemptLaunch。replacement primary 只携带旧 primary/source Attempt recovery pair；每个 recovered transient 同时携带当前 replacement parent/新 recovery Attempt/原 SpawnRequest 的 parent-spawn triple，以及旧 transient/source Attempt recovery pair。来源授权只作校验输入；coordination-only replacement 只携带 coordination recovery triple且不进入本路径。事务提交后按冻结顺序执行 `prepare_attempt_launch`，持久化每个 prepared receipt 和 `agent.attempt.launch.prepared` 后才追加对应 `agent.context.delivered`，再执行 `commit_attempt_launch`；只有全部必需 LaunchReceipt 可靠落盘并追加 `agent.attempt.launch.committed` 后，replacement AgentInstance、recovery Attempt 和 TaskExecution 才进入 running。Unknown 只能查询原 launch ID 或进入 interrupted/Attention。不能要求已销毁的旧 Handle、复用旧授权或为同一 source Attempt 创建多个 recovery Attempt。
 - `continue_pre_attempt` 只引用 process-free safe shutdown 留下的 TaskExecution 和原 pending refs。Runtime 校验它仍为 `interrupted`、`currentAttemptId` 为空、reason 为 `safe_exit_before_launch`，并确认旧 SelectionRequest/assignment/Grant/AgentInstance/capacity/claim 已按 Event 收敛且当前 TaskExecution 没有 ShutdownRecoveryPlan owner后，执行 `interrupted -> provisioning`。同 Run 存在其它 plan recovery target不构成冲突。统一 pre-Attempt pipeline 创建新的 capacity、无 recovery lineage 的普通 AgentInstance、Grant、SelectionRequest/assignment 和 claim；新 SelectionRequest 以 `retryOfSelectionRequestId` 引用 shutdown blocked 的旧请求，旧请求已 assigned 时仅用该 ID 记录 causation。原 `pendingAttemptKind/pendingFromAttemptId/pendingCommandId` 保持同一 owner；Resume command 只作为本次 causation，不覆盖 owner command，也不创建第二组 pending work。成功创建 Attempt 的事务才清空 pending refs；blocked/Unknown 仍绑定同一个 TaskExecution。
 - `restart_from_safe_boundary` 的 source Attempt entry 如果包含 `coupledDispatcherCoordinationLeaseIds[]`，Runtime 在同一个 recovery AttemptLaunch prepare 前创建 matching pending replacement lease和 dormant channel。AttemptLaunch 的 prepared registration 与 committed receipt 同时绑定业务 Attempt和这些 leases；Runtime 在 commit 事务激活 lease/token。该 source lease 不得再出现于 `restart_coordination` target。
 - `restart_coordination` 对 ShutdownRecoveryPlan 的每个 `coordinationRecoveries[]` entry 冻结全部 shutdown Handle/Launch records，只创建一个 replacement formal AgentInstance、capacity reservation、新 Grant/assignment、`purpose=dispatcher_coordination` ContextPackage、DispatcherCoordinationLaunch 和 pending target lease。Runtime 把 dormant channel ref 放入 CoordinationRequest，并按稳定 launch ID 执行 `prepare_coordination_launch -> commit_coordination_launch -> query_coordination_launch`；可靠 commit 后只激活该 lease/token。该路径不创建 TaskAttempt、ExecutionClaim、RunnerResult 或业务 Artifact，Unknown 创建 `coordination_launch_unknown` Attention 并禁止第二 Handle。
@@ -278,8 +281,8 @@ stop_run | wait_human | route_failure | continue_optional
 
 ### 6.2 Retry Task
 
-- Retry 只允许来源 Attempt 已终态但其 TaskExecution 仍为 `waiting_attention`，或来源 Attempt 正处于 exception `waiting_attention` 并走下节原子 disposition；已经终态化为 `failed` 的 TaskExecution 不可复活，改用 Rework 或从该 Task 创建新 Run。
-- Retry 的原子事务终结旧 Attempt、清除 `currentAttemptId`，并在同一 TaskExecution 写入 `pendingAttemptKind=retry`、`pendingFromAttemptId` 和 `pendingCommandId` 后进入 provisioning；它不越过异步目录选择直接创建新 Attempt。后续统一 pipeline 成功后创建带 `retryOfAttemptId` 的新 Attempt，并使用该 TaskExecution 的 `effectiveSnapshotId`。
+- Retry 只允许两种来源：来源 Attempt 已终态、但其非终态 TaskExecution 仍为 `waiting_attention` 且没有其它 pending work；或来源 Attempt 自身为 `waiting_attention`，并且命令引用与它匹配的 open `kind=exception` Attention。已经终态化的 TaskExecution 不可复活，改用 Rework 或从该 Task 创建新 Run。
+- 对已终态来源 Attempt，Retry 的原子事务保持该 Attempt 不变，校验并终结命令引用的关联 open Attention（存在时，必须同时记录 Decision），清除 TaskExecution 的 `currentAttemptId`，写入 `pendingAttemptKind=retry`、`pendingFromAttemptId` 和 `pendingCommandId`，再执行 `waiting_attention -> provisioning`。它不越过异步目录选择直接创建新 Attempt；统一 pipeline 成功后才创建带 `retryOfAttemptId`、沿用该 TaskExecution `effectiveSnapshotId` 的新 Attempt。
 - 旧 Attempt 和其 Artifact 保留为历史；只有新 Attempt 通过 Contract 的输出才可作为后续输入。
 - 如果下游 Task 尚未开始，Retry 可以在当前 Run 内继续。
 - 如果下游已经开始并消费旧 Artifact，当前 Run 不回滚；UI 提供“基于此版本从该 Task 重新开始”，创建带 `sourceRunId` 的新 Run。
@@ -288,6 +291,8 @@ stop_run | wait_human | route_failure | continue_optional
 
 - Reject 必须命中 Gate 的 `rejected` Transition，并携带用户评论或结构化原因。
 - Rework 重新激活目标 Task，创建带 `pendingAttemptKind=first` 的新 TaskExecution，完成统一 provisioning 后才创建首个 Attempt；`activationIndex`、`reworkIteration` 分别加一。上次 Artifact 的 `currentness` 标记为 `superseded`，但不可删除。
+- 从 Diff review 发起 Rework 时，`run.rework` 的 Review 输入只接收结构化 `reviewSelection={changeSetId, threadSelections[] {threadId, commentIds[]}}`，不接收由 Runtime 生成的 `diffReviewBundleRefs[]`。Runtime 在同一命令事务校验该 Change Set 是 `changeSetRefs[]` 中属于当前 Run/Rework plan 的唯一 matching ref，每个 thread 仍为 open 且绑定该 Change Set，每个 comment 属于对应 thread，选择非空且 Runtime `eligibleTargetPlan`、event sequence 和 target eligibility 仍匹配；任一 stale、resolved、跨 Change Set 或错配引用都使整条命令 conflict。
+- 校验成功后，由 Runtime 分配 bundle identity，冻结 selected thread/comment IDs、status-at-capture、event sequence 和 digest，并在按 `eligibleTargetPlan` 创建同 Run Rework activation 或 descendant Run lineage 的同一事务创建不可变 DiffReviewBundle、先追加 `diff.review.bundle.created`。后续统一 provisioning 创建新 Attempt/ContextPackage 时只能引用该 Runtime 生成的 bundle；`diff.review.bundle.created` 必须先于 `agent.context.created` durable。命令事务任一步失败时不创建 Bundle、Event、TaskExecution、descendant Run 或 Snapshot 后代；后续评论或 resolve 不改变已经冻结或投递的输入。
 - 达到 `maxIterations` 时不再自动回环，Gate 打开阻塞 Attention，用户可以结束 Run、调整未开始部分或创建新 Run。
 - Rework 不改变组织结构；需要增加 Seat 或改变未开始 Task 时使用 Run Amendment。
 
@@ -323,6 +328,7 @@ open -> resolved
 | `question` | answer | 写入结构化答案，解除 Gate |
 | `exception` | retry / skip_optional / fail_run / amend_and_rework | Retry 先终结旧 Attempt 并登记唯一 pending retry；skip 进入显式 `skipped` Transition；fail 进入 finalization；amend_and_rework 原子应用 Snapshot 后代并创建新的 TaskExecution activation |
 | `join_blocked` | retry_source / rework_source / fail_run | 恢复缺失来源后重新打开 Join，或以 `join_blocked` 结束 Run |
+| `long_wait` | keep_waiting / reconcile | 保持 Attempt 运行并记录下一观察时间，或核对同一 Handle/activity evidence；不开放 Retry、Skip 或 Fail |
 | `spawn_approval` | approve / reject | 只重验来源、预算、目录和权限后继续或拒绝 transient spawn，不生成 Amendment |
 | `staffing_request` | approve / reject | 新增 formal Seat/Task，仅影响未开始部分并生成 Amendment |
 | `workspace_selection_blocked` | retry / choose_mode / fail_task | 创建新 SelectionRequest、经用户显式覆盖选择，或结束目标 Task；不自动使用默认目录 |
@@ -333,15 +339,40 @@ open -> resolved
 | `attempt_launch_unknown` | reconcile_original / terminate_attempt | 只查询原 launch ID；有 registration 时终止 Handle，没有时按原 launch ID/digest 终止 fenced process。可靠 receipt 后把 Attempt 明确置为 interrupted，不创建第二 launch |
 | `coordination_launch_unknown` | reconcile_original / terminate_coordination | 只查询原 coordination launch ID；有 registration 时终止 Handle，没有时按原 launch ID/digest 终止 fenced process。可靠 receipt 后撤销 pending lease，保留 coordination recovery 待后续 Resume |
 | `cleanup_unknown` | retry_cleanup / record_verified_cleanup / continue_cancel / continue_finalization | 对相同 typed resources 重试/记录人工验证证据，或按既存 cancel/finalization intent 继续原 barrier；不恢复业务或改写 outcome |
+| `result_integration_unknown` | inspect / reconcile_original | 查看冻结选择和写入证据，或只对账原 integration ID/digest；不自动再次应用 |
+| `recovery_operation_unknown` | inspect / record_operation_completed / record_operation_not_completed_and_retry / end_as_failed / cancel | 对具体副作用 operation 作有证据的裁决；用户陈述不能伪造成 provider receipt |
+| `launch_blocked` | retry / update_profile / update_permission / cancel_queue_item | 修复或终止尚未创建 Run 的队列项 |
 
 process-free safe shutdown disposition 使旧 SelectionRequest 不再可继续时，Runtime 必须用 `superseded_by_safe_exit_before_launch` 系统动作 resolve 其 open `workspace_selection_blocked` Attention。该治理动作追加 `attention.resolved` 但不创建 DecisionRecord；旧 retry/choose_mode/fail_task 入口随之失效，新 SelectionRequest 若再次 blocked 才建立新 Attention。
-| `launch_blocked` | retry / update_profile / update_permission / cancel_queue_item | 修复或终止尚未创建 Run 的队列项 |
 
 动作按钮必须在上下文完整时就地可用；需要查看对比 Artifact、填写评论或调整参数时在检查器中完成。
 
 exception Attention 的每个动作都必须在一个受控事务给出旧 Attempt 的 disposition，不能先 resolve blocker 再留下活动的 `waiting_attention`：
 
-- `retry`：同一事务执行旧 Attempt `waiting_attention -> failed/user_retry_requested`、分别追加 Attempt/TaskExecution status Event、清除 `currentAttemptId`、写入稳定 pending retry 字段并把 TaskExecution 置为 provisioning、记录 Decision、resolve Attention；任一步失败全部不应用。事务提交后才停止/复用旧 Handle并走 capacity、Grant、SelectionRequest、assignment、ContextPackage 和 AttemptLaunch 的统一 pipeline；失败时 TaskExecution 进入 blocked + 新 Attention，不复活原 blocker，也不创建无 assignment 的 Attempt。
+- `retry`：只接受命令引用的 source Attempt 正处于 `waiting_attention`、TaskExecution 的 `currentAttemptId` 仍等于它，且 `attentionId` 指向同一 Attempt 的 open `kind=exception` Attention。Runtime 必须严格按以下顺序追加 durable Event：
+
+  ```text
+  task.attempt.status.changed(
+    waiting_attention -> failed,
+    resultCode=user_retry_requested
+  )
+  -> decision.recorded
+  -> attention.resolved(
+    resolvedBy=user,
+    resolvedAction=retry,
+    resolvedDecisionId
+  )
+  -> task.execution.status.changed(
+    waiting_attention -> provisioning,
+    currentAttemptId=null,
+    pendingAttemptKind=retry,
+    pendingFromAttemptId=sourceAttemptId,
+    pendingCommandId=commandId,
+    reasonCode=user_retry_requested
+  )
+  ```
+
+  四条 Event 写入及其 projection 更新必须在同一个原子 SQLite 事务中完成；这些 Event 没有同时发生或可重排的语义。任一 compare-and-set 或持久化步骤失败时四条 Event 及其 projection 全部不应用。只有事务提交后才能开始旧 Handle disposition 和异步 provisioning，包括 capacity、Grant、SelectionRequest、assignment、ContextPackage 与 AttemptLaunch；后续失败时 TaskExecution 进入 blocked + 新 Attention，不复活原 blocker，也不创建无 assignment 的 Attempt。
 - `amend_and_rework`：先建立 per-run scheduling barrier，再在一个 SQLite 事务完成旧 Attempt/TaskExecution 终结、Decision/Attention resolution、`run.amend` 全部校验、Snapshot 后代写入，以及引用来源 Attempt 的新 TaskExecution activation；`update_rework_task` 可以只为新 activation 改变权限/Runner/指令，不能热改旧 Grant。新 TaskExecution 以 `pendingAttemptKind=first` 进入统一 pre-Attempt pipeline，事务内不创建尚缺 assignment 的 Attempt。任一步失败时旧 Attempt、Attention、active Snapshot 和 activation 全部不变。
 - `skip_optional`：只对 Optional Task 原子执行 `waiting_attention -> skipped`、TaskExecution `skipped`、Decision、Attention resolution 和显式 skipped Transition。
 - `fail_run`：冻结 fatal result 并进入 Run-finalization，旧 Attempt 在同一事务终结为 failed；Attention 随 Decision 一并 resolved。
@@ -365,6 +396,8 @@ Session 的 conversation 和 instruction 共用一个可审计投递合同；补
 
 Runtime 在 `deliveryStatus=delivering` 时崩溃或丢失回执，只能在同一 live Handle/provider session 且 Adapter 声明 `messageDeliveryDedupe=true` 时，用原 `deliveryId` 重放并查询原 receipt。其它情况转为 `delivery_unknown`、追加 delivery Event 并创建 Attention，禁止自动重投；用户可明确把内容加入新 Attempt，但那会生成新的 delivery ID 和审计记录。Terminal 拥有输入权时，两种 Session 消息都不能并发写入。
 
+`deliveryMode=next_attempt` 首版只允许 `messageKind=instruction`。queued Message 不提供撤回或原地替换；修正通过追加新的 instruction，历史顺序按 Event sequence 保留。
+
 实时路径必须记录作者、时间、目标 Attempt 和 Runner 回执；排队路径在 Attempt 创建前只显示“已加入下次尝试”，不能显示为已发送。两条路径都通过 Message 与投递事件回放，不能从 UI 文案推断状态。
 
 Session 中的普通消息先持久化并绑定目标 Seat、Task 和 Run；有活动 Attempt 时按上述能力投递。长期 Seat Session 可以包含多个 Direct Task/Run 并允许自由对话，但不保存无 Task/Run 归属的消息。用户切换视图不会创建新 Attempt。
@@ -379,7 +412,7 @@ Session 中的普通消息先持久化并绑定目标 Seat、Task 和 Run；有�
 
 Runner 官方 hook 或平台 broker 拦截 `ask` operation 后，通过绑定 Handle/Attempt 的 Runtime request channel 提交稳定 `permissionOperationRequestId`、operation ID/kind/digest、PermissionGrant 和脱敏 intent ref。Runtime 在同步 barrier 中先持久化 `permission.operation.requested` 和 typed Attention，再让 Attempt 进入 `waiting_attention`；持久化完成前不得释放 operation。
 
-`attention.resolve(approve_once|reject)` 使用 compare-and-set，同时创建 DecisionRecord、终结原 Attention/PermissionOperationRequest，并创建稳定 PermissionDecisionDelivery。`approve_once` 只适用于同 Handle generation 的同一 operation digest，不替换 Grant、不授权下一次相似命令。Adapter/broker 以相同 delivery ID 返回结构化 receipt 后，Runtime 才执行 `waiting_attention -> running | failed`；Run paused 时按 deferred resolution 屏障处理。
+`attention.resolve(approve_once|reject)` 使用 compare-and-set，同时创建 DecisionRecord、终结原 Attention/PermissionOperationRequest，并创建稳定 PermissionDecisionDelivery。`approve_once` 只适用于同 Handle generation 的同一 operation digest，不替换 Grant、不授权下一次相似命令。Adapter/broker 以相同 delivery ID 返回结构化 receipt 后，Runtime 才执行 `waiting_attention -> running | failed`；Run paused 时按 deferred resolution 屏障处理。 当前 operation 必须已经落在该 immutable Grant 的 `ask` policy 内；如果活动工作需要新增 Allowed path 或扩大 capability，`permission_operation` 不提供继续入口，必须改走 exception Attention 的 `amend_and_rework`，终结旧工作并为新 Snapshot/TaskExecution/AgentInstance 创建新 Grant。
 
 相同请求/decision/delivery digest 重放返回原结果，不同 digest conflict。审批超时等同 reject。批准 receipt unknown 时创建 `permission_decision_delivery_unknown` Attention 并保持 Attempt blocked；只有同 live hook 声明 dedupe/query 能力时可查询原 delivery，禁止自动重发批准。崩溃恢复同时检查 request、decision receipt 和 RecoveryCheckpoint；缺一项时不能推断外部操作已经执行或安全重试。
 
@@ -397,7 +430,7 @@ operations[]
 
 Runtime 先建立 per-run scheduling barrier，暂停新 Task 派发但不停止已运行 Task。随后在同一个 SQLite 写事务内校验 sequence、`activeSnapshotId == baseSnapshotId`、Run 状态和全部结构化 operation；成功时创建 RunAmendment 与新的不可变 RunSnapshot、更新 `activeSnapshotId` 并追加 `run.amended`。新 Snapshot 只用于尚未开始部分，既有 Attempt 保持原 `effectiveSnapshotId`。任何校验或写入失败都不创建 Amendment、不前移 active Snapshot、不追加 Event、不部分应用，并在释放 barrier 后恢复派发。相同 `commandId` 重放返回同一结果。
 
-允许的 operation 固定为 `add_formal_seat | disable_unstarted_seat | add_task | disable_unstarted_task | update_unstarted_task | update_rework_task | update_untriggered_gate | add_transient_runner_profile_binding | increase_execution_budget | replace_unstarted_permission_grant`。它们覆盖新增 formal Seat/Task、修改未开始 Task、为 `amend_and_rework` 的新 activation 冻结配置、增加 transient Profile allow-list、提高运行中预算，以及为没有 AttemptLaunch、live Handle、coordination lease 或 operation 的未启动 TaskExecution/AgentInstance 原子替换 PermissionGrant；禁用 Seat 时必须原子处理其未开始 Task。禁止修改已完成/运行中 Task、已产生 Artifact 的含义、已解决 Gate、历史 Event，或降低正在使用的预算；活动 Attempt/Handle 不得原地扩大 Grant。`attention.resolve(approve staffing_request)` 必须调用同一事务入口，不能产生第二套 Amendment 语义。
+允许的 operation 固定为 `add_formal_seat | disable_unstarted_seat | add_task | update_unstarted_task | update_rework_task | update_untriggered_gate | add_transient_runner_profile_binding | increase_execution_budget | replace_unstarted_permission_grant`。它们覆盖新增 formal Seat/Task、修改未开始 Task、为 `amend_and_rework` 的新 activation 冻结配置、增加 transient Profile allow-list、提高运行中预算，以及为没有 AttemptLaunch、live Handle、coordination lease 或 operation 的未启动 TaskExecution/AgentInstance 原子替换 PermissionGrant；禁用 Seat 时必须在同一事务重新指派其全部未开始 Task，V1 不提供 Role 或 Task 停用。禁止修改已完成/运行中 Task、已产生 Artifact 的含义、已解决 Gate、历史 Event，或降低正在使用的预算；活动 Attempt/Handle 不得原地扩大 Grant。`attention.resolve(approve staffing_request)` 必须调用同一事务入口，不能产生第二套 Amendment 语义。
 
 ## 9. Artifact 与版本
 
@@ -411,6 +444,8 @@ Project File、Change Set 和 Artifact 的边界及检查交互见 [workspace-ou
 artifactId
 runId
 contractId
+sourceArtifactCandidateId
+sourceValidationRecordId
 producerTaskId
 producerAttemptId
 producerAgentInstanceId
@@ -421,7 +456,7 @@ contentRef
 contentDigest
 integrity
 createdAt
-validationStatus
+validationStatus              valid
 currentness
 supersedesArtifactId?
 consumedBy[]
@@ -429,8 +464,8 @@ consumedBy[]
 
 - Artifact 是追加式版本；下游消费后不能原地覆盖。
 - 同一 Contract 的新 Attempt 产出新版本，旧版本保持可查看。
-- `validationStatus` 为 `valid | invalid`，`currentness` 为 `active | superseded`；消费关系单独追加到 `consumedBy`。
-- Contract 校验未通过的产物可以保存为 `invalid`，但不能作为必填 Input 传递。
+- 正式 Artifact 只有 `validationStatus=valid`；`currentness` 为 `active | superseded`，消费关系单独追加到 `consumedBy`。
+- Contract 校验未通过时保存 ArtifactCandidate、不可变 ValidationRecord 和诊断，不创建 Artifact，也不能进入 Handoff、Gate 或 Task success。
 
 ### 9.2 消费和重做
 
@@ -438,7 +473,10 @@ consumedBy[]
 - Rework 产生新版本后，后续新 Attempt 只能消费通过校验的最新有效版本；历史 Attempt 仍显示原版本。
 - Run 结束时保留最终结果、关键 Artifact、失败原因和每次 Attempt 的关系图。
 - 每个 Attempt 完成时冻结其 Change Set target；Run 累计 Change Set 必须能追溯到对应 Attempt，或明确标记为用户、外部程序、共同修改或未知来源。
-- worktree 或临时目录结果按 `review | auto_if_clean | manual` 处理，默认 review。目标基线漂移或应用冲突创建 Attention，不能自动覆盖。
+- worktree 或临时目录结果按 `review | auto_if_clean | manual` 处理，默认 review。Runtime 在隔离结果可审阅时先持久化 ResultReviewRequest，并通过 `execution.result.review_requested` 生成稳定 `resultReviewRequestId`；目标基线漂移或应用冲突创建 Attention，不能自动覆盖。
+- `execution.result.reject` 只引用仍为 `review_requested` 的 `resultReviewRequestId`，且要求没有非终态 Apply attempt；成功直接终态化 ResultReviewRequest，不创建 ResultIntegrationAttempt。用户因此可以在第一次 Review 直接 Reject。ResultIntegrationAttempt 只由实际 Apply 创建，并回指同一 request。
+- 每个 ResultIntegrationAttempt 由 Runtime 冻结 `selectedChangeSetEntryRefs[]` 和 `selectedArtifactRefs[]`；两组的合并基数必须至少为一，任一组可以为空，因此 file-only、Artifact-only 和两者组合的整合都合法。Runtime 分别校验 Change Set entry 的来源/完整性和 Artifact 的 `valid` 状态、完整性与目标适用性，再冻结 target baseline 和 request digest；Client 只提交选择，不能创建 integration identity 或隐式补选。staging 和目标写入必须整体提交，失败或 Unknown 不得留下部分应用。
+- Result integration Retry 只允许 source `ResultIntegrationAttempt.status == failed`。Retry 使用新 command ID 并创建新的不可变 ResultIntegrationAttempt，其 `retryOfIntegrationAttemptId` 必须引用该 source failed attempt；Runtime 必须重新执行正常的 target、expected baseline、selection、integrity 和 policy validation。`integration_unknown` 必须先通过原 integration ID/digest 对账并被 canonical 归类为 `failed`，才能按上述规则 Retry；不得直接从 `integrated`、`requested`、`staging`、`reconciling` 或 `integration_unknown` Retry。ResultReviewRequest 已为 `integrated | rejected` 时不得再创建 Apply；source attempt 一旦成为 `integrated`，Runtime 永远不得发起第二次 target write。
 
 Message、Task Event、DecisionRecord、谱系、Attention、Artifact 和 Change Set 引用随 Run 历史保留。原始 Terminal/stdout 默认保留 30 天且每个 Run 最多 100 MB；EvidencePin 经脱敏后独立保留，导出和清理由 Workspace 级 HistoryExportRecord、HistoryDeletionRecord 审计。搜索、导出、清理和恢复遵循 [m6-execution-workspace-security.md](m6-execution-workspace-security.md)。
 
@@ -446,9 +484,9 @@ Message、Task Event、DecisionRecord、谱系、Attention、Artifact 和 Change
 
 ### 10.1 正常退出
 
-- 关闭主窗口只等待编辑命令落盘，然后隐藏到系统托盘。Runtime、Runner、队列和计划继续运行，不改变 Run 状态。
-- 用户从托盘显式退出时显示活动 Run 摘要，默认动作为“安全暂停并退出”；也可以取消 Run 后退出或返回应用。
-- 安全退出先选择当前 data root 的全部非终态 Run，而不是先按进程存在性过滤。Runtime 为每个 Run 持久化唯一 `shutdownFenceId`，随即停止计划触发、新派发、spawn、新 AttemptLaunch/DispatcherCoordinationLaunch 的 prepare/commit、Session/Terminal 输入和 request channel 新 operation；fence 后到达的请求按稳定 code 拒绝。除 idle Direct 外，`running` Run 在建立 fence 的事务先追加 `running -> pausing` 的 `run.status.changed(reasonCode=safe_shutdown_requested)`；已经 `pausing | paused` 的 Run 不重复制造转换。`interrupted | canceling | resuming | preparing` Run 仍按各自 canonical barrier 收敛，不能因没有 Handle 或状态名跳过 fence。
+- 关闭主窗口只要求 Client Draft recovery journal 与全局 operation registry durable flush，然后隐藏到系统托盘；不等待全部 Draft batch 终结。accepted Draft command 已由 Runtime durable ledger 接管，页面/窗口关闭不取消它。Runtime、Runner、队列和计划继续运行，不改变 Run 状态。
+- 用户从托盘显式退出时显示活动 Run 摘要，默认动作为“安全暂停并退出”；也可以取消 Run 后退出或返回应用。journal/registry flush 后，Runtime 在 sidecar writer/admission serialization 建立全局 command-admission fence，等待 admission 临界区内请求完成 accepted/rejected/conflict 判定，再以 `runtime_shutting_down` 拒绝新 Domain command。read/query 和原 command reconciliation 继续可用。
+- command-admission fence 生效后，Runtime 先扫描 durable command ledger 中 accepted 且没有 terminal result 的 Draft row，使用保存的原 `commandId + expectedRevision + operationDigest + operations[]` 幂等重新派发/对账；matching applied Event或 durable rejected/conflict 才终结，accepted receipt 不算完成。该 drain 不等待 buffered/local-only batch promotion。随后安全退出选择当前 data root 的全部非终态 Run，而不是先按进程存在性过滤。Runtime 为每个 Run 持久化唯一 `shutdownFenceId`，随即停止计划触发、新派发、spawn、新 AttemptLaunch/DispatcherCoordinationLaunch 的 prepare/commit、Session/Terminal 输入和 request channel 新 operation；fence 后到达的请求按稳定 code 拒绝。除 idle Direct 外，`running` Run 在建立 fence 的事务先追加 `running -> pausing` 的 `run.status.changed(reasonCode=safe_shutdown_requested)`；已经 `pausing | paused` 的 Run 不重复制造转换。`interrupted | canceling | resuming | preparing` Run 仍按各自 canonical barrier 收敛，不能因没有 Handle 或状态名跳过 fence。
 - Runtime 独立计算每个 Run 的 process/Unknown reconciliation set 与 process-free pre-Attempt aggregate set，不把两者作为 Run 级互斥路径。存在非 stopped RunnerHandleRegistration、可能已创建 process 的 in-flight launch，或 unresolved cleanup resource 时创建 ShutdownRecoveryPlan。Runtime 对每个已登记 Handle 调用 `quiesce_for_shutdown(handle, fence)`，包括没有活动 Attempt 的 idle Direct Handle 和承载 DispatcherCoordinationLease 的 Handle。Adapter 必须返回绑定 RunnerHandleRegistration、Handle generation、fence 和最后 operation sequence 的 typed ShutdownFenceReceipt；`completed` 证明进程树已不存在，`quiesced` 只证明不再接受 operation。单一 `pauseResume` acknowledgement 不是 shutdown evidence。所有 receipt/checkpoint 与 fenced/quiesced lifecycle Event 先持久化，Runtime 再确认没有更高 operationSequence，并冻结 ShutdownRecoveryPlan：`liveHandles[]` 覆盖 fence 时全部 registered Handle，`inFlightLaunches[]` 覆盖无 registration 的 process candidate；attempt-kind record 同时冻结对应 AttemptLaunch 的 `pendingDispatcherCoordinationLeaseIds[]`，`unresolvedCleanupSubjectRefs[]` 覆盖其它 Unknown。没有这些 candidate 时不创建空 plan。
 - `recoverableAttempts[]` 通过 handle/launch record arrays 覆盖每个允许业务恢复的 source Attempt；`coordinationRecoveries[]` 只覆盖没有可恢复业务 Attempt owner、但仍需要恢复的 source lease。两组对每个 shutdown Handle/Launch record 全局互斥，允许恢复的 record 恰好属于一个 owner。同一个 Dispatcher process candidate 同时承载 Attempt 和 lease 时，无论它是已登记 Handle 还是 pre-registration AttemptLaunch，该 record 都只归 source Attempt；active/pending lease 写入该 entry 的 `coupledDispatcherCoordinationLeaseIds[]`，不得再创建 coordination recovery entry。cancel/finalization intent 已冻结的 Run 不创建业务 recovery work。
 - plan 与 `run.shutdown.recovery_plan_created` 落盘的同一事务把 `resumeOnStartup` 设置或保持为 true，registration 此时最多为 quiesced。Runtime 随后对 in-flight launch 调用 `terminate_launch`，对 quiesced registration 调用 `terminate_handle`，completed registration 使用原 receipt 作为 stopped evidence；所有 not-found 必须来自 typed receipt。matching evidence 落盘后才追加 launch reconcile、registration stopped、AgentInstance stopped、lease revoke 和资源 release Event。
@@ -456,11 +494,13 @@ Message、Task Event、DecisionRecord、谱系、Attention、Artifact 和 Change
 - 无论 Run 是否创建 plan，Runtime 都要对未被任何 shutdown Handle/Launch record 或 plan owner 覆盖、且资源状态明确的 process-free pre-Attempt aggregate 执行相同 disposition。它在有界事务按适用的 `execution.workspace.blocked(safe_exit_before_launch)`、旧 selection Attention 的 `attention.resolved(superseded_by_safe_exit_before_launch)`、`execution.workspace.released`、`permission.grant.status_changed(... -> revoked)`、`agent.instance.stopped(lifecycleEvidenceKind=not_started, capacityReleasedAt)`、`task.execution.status.changed(... -> interrupted, releasedExecutionClaimId, cleared target refs)` 顺序收敛。只有 `pending_delivery | awaiting_selection | validating` 请求进入 blocked；旧请求已 blocked 或 assigned 时保留其状态，但该 request/target 的所有 open `workspace_selection_blocked` Attention 都必须由 Runtime 终结，assigned 只释放 assignment。最后一个 TaskExecution Event 保留原 pending owner。任一资源 Unknown 都进入 plan 的 `unresolvedCleanupSubjectRefs[]` 或拒绝 acknowledgement，不能留下非终态孤儿对象或仍可操作的旧 Attention。
 - 所有 process/Unknown reconciliation 和 process-free aggregate 都收敛后，Run 才执行一次 canonical disposition：`pausing -> paused`、`preparing | resuming -> interrupted`、paused/idle Direct/interrupted 同状态，或继续既有 cancel/finalization 到终态。没有 pending work 的非 idle Direct `running | pausing` Run 进入 paused。`preparing` Run 若从未创建 TaskAttempt/AttemptLaunch且 pre-Attempt owner 完整，以 `preparing -> interrupted`、`resultCode=safe_exit_before_launch` 完成。`resuming` Run 若尚未为某个 target 创建新 Attempt/CoordinationLaunch/Handle，则撤销该未启动 aggregate；process recovery 回到原 plan owner，process-free work 回到 interrupted pending owner。
 - 下次 Resume 的 target set 可以同时包含 plan recovery 和 `continue_pre_attempt`。后者只要求该 TaskExecution 的 aggregate 没有 plan owner，不要求整个 Run 没有 plan；它创建无 recovery lineage 的新实例并继续原 pending owner。带 coupled lease 的 recovery Attempt 在同一个 AttemptLaunch prepare 前创建 replacement pending lease和 dormant channel，并由同一个 registration/commit 激活，不创建 DispatcherCoordinationLaunch。只有 coordination-only entry 才建立独立 AgentInstance、DispatcherCoordinationLaunch 和 Handle。
-- 默认优雅退出期限为 30 秒。每个选中 Run 的两类收敛工作完成后，Runtime 都必须追加唯一 `run.status.changed(reasonCode=safe_shutdown_completed, shutdownFenceId, shutdownRecoveryPlanId?, resumeOnStartup=false)`；存在 plan 时必须携带 plan ref。该 Event durable 后才算该 Run 完成；全部选中 Run 都完成后才返回 shutdown acknowledgement，Shell 随后只结束 Runtime sidecar/自身进程树。任一 termination 或 cleanup Unknown 都不返回安全 acknowledgement，保持 `resumeOnStartup=true` 并进入强制退出/marker 对账。
-- 超时强制退出时，Runtime 若可响应，由 Runtime 把未确认 Attempt 置为 `interrupted` 并保持 `resumeOnStartup=true`。Runtime 不响应时，Shell 只写 supervisor shutdown marker 和诊断后终止进程树；下次 Runtime 对账时补写业务状态。Shell 不能直接修改 Attempt 或 Run。
+- 默认优雅退出期限为 30 秒。每个选中 Run 的两类收敛工作完成后，Runtime 都必须追加唯一 `run.status.changed(reasonCode=safe_shutdown_completed, shutdownFenceId, shutdownRecoveryPlanId?, resumeOnStartup=false)`；存在 plan 时必须携带 plan ref。全部选中 Run completion Event durable，且 accepted Draft drain 全部 row 已 canonical applied/rejected/conflict 后才返回 shutdown acknowledgement，Shell 随后只结束 Runtime sidecar/自身进程树。零 active Run 也必须完成 admission fence 与 Draft drain。任一 Run cleanup 或 accepted command 未收敛都不返回安全 acknowledgement，只保留 Continue waiting / Force quit。
+- 超时强制退出时，Runtime 若可响应，由 Runtime 把未确认 Attempt 置为 `interrupted` 并保持 `resumeOnStartup=true`。Force quit/crash 可以绕过 accepted Draft drain；Runtime 不响应时，Shell 只写 supervisor shutdown marker 和诊断后终止进程树。下次 Runtime 在 write-ready 前扫描 accepted-without-terminal-result ledger row，并以原 commandId/payload 幂等重新派发/对账；Shell 不能直接修改 Attempt、Run 或 Draft result。
 - 注销、关机、崩溃和未确认 shutdown 的 Run 保持 `resumeOnStartup=true`，下次登录时自动进入风险感知恢复。
 
 ### 10.2 意外中断
+
+以下 per-Run 恢复属于 Runtime 全局 startup classification barrier。普通 Domain write admission 在所有 Run 的 marker、launch、delivery、Handle、claim、Attempt 和 recovery owner 被持久化分类前保持关闭；无法自动继续但已进入 `interrupted/degraded` 并创建 typed Attention 的项视为已稳定分类，不等待用户 resolve。
 
 重启后对每个非终态 Run 执行：
 
@@ -469,7 +509,7 @@ Message、Task Event、DecisionRecord、谱系、Attention、Artifact 和 Change
 3. 从 `node.execution.*` 重建 Start/End/Gate/Join 的 activation、到达集合和终态，不从画布位置或 Attention 是否可见猜测 Join。
 4. 检查 Runner 进程登记、ExecutionClaim、可靠 Runner 回执和各 operation 的 checkpoint set。
 5. 能确认已完成的 Attempt 写入缺失终态；无法确认的活动 Attempt 置为 `interrupted`。
-6. 对可证明无副作用、幂等或可从可靠 checkpoint 恢复的工作自动创建 recovery Attempt；其它 Run 保持 `interrupted + degraded`，在检查器展示“恢复、结束为失败、取消”三个明确动作。
+6. 对可证明无副作用、幂等或可从可靠 checkpoint 恢复的工作自动创建 recovery Attempt；具体 operation 的副作用状态未知时创建 `recovery_operation_unknown` Attention。只有全部 operation 可安全分类后才开放普通 Resume；否则保留 `interrupted + degraded`，提供有证据的 operation 裁决、结束为失败或取消。
 
 恢复不能根据 UI 最后看到的状态猜测；必须以持久化 Event、Runner 回执或检查点为依据。
 
@@ -480,7 +520,7 @@ Message、Task Event、DecisionRecord、谱系、Attention、Artifact 和 Change
 - 已有成功 Artifact 的 Task 不重复执行；没有完整输出的 Attempt 只有在恢复边界之前所有已登记 operation 均可安全分类时才创建新的 recovery Attempt，并记录 `recoveredFromAttemptId` 和完整有序的 `recoveryContexts[]`。可靠 committed 项也必须作为 `continue_after_commit` 进入计划。
 - 来源 Runner 进程已退出时必须创建新的 AgentInstance，并用独立 recovery refs 连接原 AgentInstance/Attempt；Runtime 在创建 recovery Attempt/ContextPackage 前重新建立有效 ExecutionWorkspaceAssignment 和独立 PermissionGrant。目录或授权无法按冻结策略重建时创建 Attention 并保持 interrupted/degraded。
 - Runner 无法提供检查点时，只有无副作用或可验证幂等的操作可以自动从最后安全输入边界重新开始。
-- 已发送但没有可靠回执的提交、发布、删除、外部写入和其它非幂等操作必须创建 Attention；Runtime 不能根据文件存在、Terminal 尾行或模型自述猜测成功。
+- 已发送但没有可靠回执的提交、发布、删除、外部写入和其它非幂等操作必须创建 `recovery_operation_unknown` Attention；`record_operation_completed` 要求可验证结果引用，`record_operation_not_completed_and_retry` 要求明确的未发生证据并创建新的 recovery Attempt。Runtime 不能根据文件存在、Terminal 尾行、模型自述或用户无证据陈述猜测成功。
 - 恢复校验、目录/授权重建或 replacement 启动失败不能覆盖原中断信息，也不能自动把 Run 变为 failed。Run 保持 `interrupted + degraded` 并创建 typed Attention；用户修复后重试 Resume，或显式使用 `run.end_failed`/Cancel。
 
 `run.end_failed` 是没有既存 `terminationIntent=cancel` 且没有 `finalizationOutcome` 的 interrupted Run 的唯一“结束为失败”命令。它必须携带 `runId`、`expected_sequence` 和非空 `reason`，先用 intent-only `run.status.changed(interrupted -> interrupted)` 持久化 `terminationIntent=fail`、`finalizationOutcome=failed`、`finalizationResultCode=interrupted_ended`、source ref 和 `reasonCode=end_failed_requested`，关闭恢复、派发、spawn 和消息入口，再执行与其它终态相同的 Handle/worker/assignment 收敛。全部资源确认终态后才提交 `interrupted -> failed`；状态不明时 Run 保持 `interrupted + degraded` 并创建 cleanup Attention。已有 finalization intent 时返回 `conflict/finalization_already_frozen`，由 Resume/`continue_finalization` 继续原 barrier，不能覆盖为 `interrupted_ended`。它不能替代语义为 canceled 的 `run.cancel`，也不要求先伪造 exception Attention。相同 `commandId` 重放返回原结果。
@@ -492,6 +532,8 @@ Message、Task Event、DecisionRecord、谱系、Attention、Artifact 和 Change
 Runtime 至少追加以下稳定事件：
 
 ```text
+orchestration.draft.applied
+orchestration.validation.changed
 run.created
 run.status.changed
 run.shutdown.recovery_plan_created
@@ -533,7 +575,9 @@ agent.instance.created
 agent.instance.status.changed
 agent.instance.stopped
 runner.handle.registered
+runner.handle.control_transferred
 runner.handle.status_changed
+runner.handle.disposition_recorded
 dispatcher.coordination.launch.created
 dispatcher.coordination.launch.prepared
 dispatcher.coordination.launch.committed
@@ -543,8 +587,9 @@ dispatcher.coordination.lease.status_changed
 agent.attempt.launch.prepared
 agent.attempt.launch.committed
 agent.attempt.launch.failed
+agent.artifact_candidate.recorded
+agent.artifact_candidate.validated
 agent.runner.result.created
-seat.status.changed
 agent.message.recorded
 agent.message.delivery_changed
 agent.context.created
@@ -562,9 +607,16 @@ execution.workspace.blocked
 execution.workspace.assigned
 execution.workspace.released
 execution.result.review_requested
+execution.result.integration_started
+execution.result.integration_reconciling
+execution.result.integration_unknown
 execution.result.integrated
 execution.result.rejected
 execution.result.integration_failed
+diff.review.thread.created
+diff.review.comment.added
+diff.review.thread.status_changed
+diff.review.bundle.created
 permission.grant.created
 permission.grant.replaced
 permission.grant.status_changed
@@ -603,7 +655,7 @@ payload
 - 收到大于 `lastSequence + 1` 的事件时暂停局部更新，请求缺失事件或完整 Snapshot。
 - 完整 Snapshot 携带 `asOfSequence`，应用成功后再继续后续事件。
 - 事件应用失败时不能继续播放后续事件；显示连接/对账错误并提供重试。
-- 对账完成后才清除 `degraded` 状态，不能用动画结束作为恢复依据。
+- 对账完成后才清除该 Client projection 的 stale/offline 标记，不能用动画结束声称视图恢复最新。Run health 独立来自 Runtime snapshot/Event 中的 canonical evidence；Client 重连本身既不设置也不清除 `degraded`。
 
 ## 12. 运行画布与检查器行为
 
@@ -644,9 +696,12 @@ AgentInstance 的 Session、Terminal、Activity、Changes 和 Artifacts 是同�
 | 场景 | 运行状态 | UI 操作 |
 |---|---|---|
 | Runner 探测失败 | `preparing` 或 `failed` | 重试探测、查看诊断、取消启动 |
-| Task 失败等待人 | `running + needs_attention` | Retry、跳过可选任务、Fail Run、Amend |
+| Task 失败等待人 | `running + needs_attention` | Retry、跳过可选任务、Fail Run、Amend and Rework |
 | Attention 已被处理 | 不变 | 显示处理人、动作和时间，不重复执行 |
-| 事件连接断开 | `degraded` | 重连、请求快照、查看离线提示 |
+| Client Event stream 断开 | Run health 不变；当前 Client projection 为 stale/offline | 禁用依赖最新 sequence 的动作，重连、请求快照、查看离线提示 |
+| 必需 Runner Handle/signal channel 不可用或恢复未完成 | `degraded`（可与 canonical Run status 并存） | 查看 Runtime 证据、处理 Attention 或继续对账 |
+| Result integration failed | `ResultIntegrationAttempt=failed` | 审阅失败后，使用新 command ID 创建新的不可变 Retry attempt |
+| Result integration receipt unknown | `ResultIntegrationAttempt=integration_unknown` | 只检查或对账原 attempt；禁止 Retry 或新的 target write |
 | 进程崩溃 | `interrupted + degraded` | Resume、结束为失败、Cancel |
 | Run 取消 | `canceled` | 查看历史、基于版本重新开始 |
 | Run 完成 | `succeeded` / `failed` | 查看结果、Artifact、重新开始 |
@@ -655,17 +710,18 @@ AgentInstance 的 Session、Terminal、Activity、Changes 和 Artifacts 是同�
 
 - Pause 能保证不再启动新的 Task；活动 Runner 的差异被明确显示。
 - Cancel 是不可逆且可审计的，所有中间 Artifact 保留。
-- Retry、Reject/Rework 和跨进程 Recovery 都创建新的 Attempt，不覆盖历史结果；同一 live Handle 的 paused Resume 保持原 Attempt。
+- Task Retry、Rework 和跨进程 Recovery 按各自规则创建新的 TaskAttempt，不覆盖历史结果；同一 live Handle 的 paused Resume 保持原 Attempt。结果 Review 的 Reject 只终态化 ResultReviewRequest，绝不为了 Reject 伪造 ResultIntegrationAttempt。
 - Attention 的重复提交不会重复触发 Transition 或创建重复 Artifact。
 - Optional skip 只能进入显式 `skipped` Transition；blocked Join 必须有可重试来源或 `fail_run` Attention，不能形成无动作死锁。
 - End outcome、Direct Task 逐轮 Attempt/显式关闭和 interrupted `run.end_failed` 都可以从 Event 重放，不依赖 UI 推断。
 - Run 启动后 Workspace Draft、Runner 默认值和 UI Locale 变化不改变 Snapshot。
-- 应用重启后能通过事件序列和快照恢复；不能仅凭最后一次 UI 状态恢复。
+- 应用重启后能通过事件序列和快照恢复；graceful quit drain 全部 already-accepted Draft command，Force quit/crash 后 startup 只用原 commandId/payload恢复未终态 row。accepted-row 收敛后 write-ready 仍关闭，直到全部 Runtime subject durable 分类；对应 revision 仍只由 matching Event/Snapshot推进，不能仅凭最后一次 UI 状态恢复。
 - 事件缺口、重复和对账失败都有可见状态和重试入口。
 - `zh-CN` 与 `en-US` 下状态、操作和失败原因语义一致，系统文案不把内部枚举直接展示给用户。
 - 三种执行目录、派生预算和 PermissionGrant 在启动前完成校验，冲突或权限不足不会静默改模式或扩大范围。
 - ExecutionWorkspaceSelectionRequest 从 Runtime 发起并绑定稳定 target ID；超时、重复冲突和重启恢复不会创建错误 assignment 或绕过容量预留。
 - 长期 Seat Session 的消息、附件、搜索和恢复都能回到明确 Task/Run。
+- 零 active Run 的显式退出仍执行 journal flush、sidecar command-admission fence 和 accepted Draft drain；30 秒未收敛不返回 safe acknowledgement。
 
 ## 15. 实施约束
 

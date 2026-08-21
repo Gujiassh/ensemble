@@ -1,5 +1,9 @@
 # F1 Specification Review
 
+> **HISTORICAL · PARTIAL EVIDENCE · NOT CURRENT AUTHORIZATION**
+>
+> 本文件原样保留当时的审查正文、结论和证据，仅可用于未变化范围的历史参考。当前状态以 [Ensemble Specs Index](../README.md) 为准；下文任何 PASS、ACCEPT、ready、commit/push 或 next-lane 表述均为历史陈述，不能授权 F0/F0-A1、重新打开的 F1 合同或任何产品实现。
+
 **Date**: 2026-08-18
 **Scope**: `f1-shell-design-system.md`, F1 entry in `12-dev-plan.md`, and links from the M6 product spec
 **Risk level**: Standard. This review covers the client foundation but does not approve Runtime persistence or packaging.

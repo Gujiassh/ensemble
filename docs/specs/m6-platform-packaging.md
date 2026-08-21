@@ -1,16 +1,18 @@
 # M6 Cross-Platform Packaging Spike
 
-**状态**：进程形态已选；三平台 Spike 证据待补（2026-08-20）
+**状态**：Electron生产壳已选；独立审查与三平台Spike证据待补；实现暂停（2026-08-21）
 **平台**：Windows、macOS、Linux
-**目标**：证明 Rust Runtime sidecar、托盘生命周期和三个用户安装的 Runner 可以组成一个可运行产品
+**目标**：证明固定Electron/Chromium、签名Rust Runtime sidecar、托盘生命周期和三个用户安装Runner可以组成一个可安装、可更新产品
 
 ## 1. 不可妥协的要求
 
-- Ensemble 安装包不要求系统 Python、Node、pnpm 或仓库依赖；`pi`、Codex CLI 和 Claude Code 由用户自行安装和登录。
+- Ensemble安装包内置固定Electron运行时和Rust Runtime sidecar，不要求系统Python、Node、pnpm或仓库依赖；`pi`、Codex CLI和Claude Code由用户自行安装和登录。
+- Electron、`electron-builder`和兼容`@electron/fuses`精确固定并记录Chromium；生产Renderer只加载`app://ensemble`。Fuse顺序固定package -> flip/readback -> sign/notarize -> final installed-binary readback。
 - 应用使用平台原生应用目录保存配置、Workspace、Run、Artifact 和日志。
 - Runtime 只绑定 loopback，并使用单次会话认证。
-- Shell 能可靠启动、健康检查、重启和清理 Runtime；关窗到托盘时不能误停后台任务。
-- 同一 canonical data root 只有一个 supervisor/Runtime；自动登录启动与手动启动竞态必须激活现有窗口，不能生成第二个 scheduler 或并发打开 SQLite。
+- Electron Main能从`process.resourcesPath`签名manifest可靠启动、健康检查、重启和清理Runtime；禁止PATH/env/fallback；关窗到托盘时不能误停后台任务。
+- Security owner的BrowserWindow factory、Preload/IPC、navigation/window/permission、external exact allowlist/native confirm、fuse policy和MessagePort exact byte-credit满足[m6-electron-shell.md](m6-electron-shell.md)；Lifecycle/Platform不得复制policy。
+- 单一Electron app owner在Runtime spawn前建立；同一canonical data root只有一个Runtime datastore owner。自动登录与手动启动竞态必须激活现有窗口，不能生成第二scheduler或并发打开SQLite。
 - Runner 探测结果能区分可用、缺配置、版本不兼容和平台不支持。
 - 交互式 Runner 的 Terminal 在 Windows 使用 ConPTY、在 macOS/Linux 使用 PTY 或经验证的等价能力；Session/Terminal 切换不能启动第二个 CLI。
 - 平台层能执行四种权限档位、原生多目录授权、凭据存储和秘密脱敏；无法执行的限制必须在探测时报告。
@@ -20,33 +22,39 @@
 
 ## 2. 已选择的交付形态
 
-生产使用随安装包交付、单独签名的 Rust Runtime sidecar。Tauri 进程作为 supervisor 并在系统托盘中保持运行；Runtime 通过随机 loopback 端口提供认证命令、事件和 Terminal 通道。完整边界见 [m6-local-runtime-scheduling.md](m6-local-runtime-scheduling.md)。
+生产使用单一Electron Shell和随安装包交付、单独签名的Rust Runtime sidecar。Main在Runtime spawn前调用`app.requestSingleInstanceLock()`，从`process.resourcesPath`签名manifest解析sidecar，并在系统托盘中保持运行；Runtime通过随机loopback端口提供认证命令、Event和Terminal通道。Event/Terminal由MessagePort有界转发。完整边界见[m6-electron-shell.md](m6-electron-shell.md)和[m6-local-runtime-scheduling.md](m6-local-runtime-scheduling.md)。
 
-F0 不再比较 Rust 进程内、Python sidecar 和开发服务器三条路线。Spike 必须证明选定形态在三个平台成立；失败时回到产品决策，不增加隐藏回退 Runtime。
+F0不再比较旧壳、Electron、Rust进程内、Python sidecar和开发服务器路线。Spike必须证明单一Electron+Rust sidecar在三个平台成立；失败时回到产品决策，不增加双壳、隐藏Runtime或旧supervisor翻译层。
 
 ## 3. Spike 工作项
 
 ### Shell 生命周期
 
+- 验证Security factory的BrowserWindow五项设置、`app://ensemble`/CSP/no-Node、navigation/window/permission默认拒绝；external URL经compile-time exact HTTPS target、3/10s rate limit、Main native Cancel/Open和one-shot final primitive，绝不信任Renderer gesture claim
+- 验证唯一frozen Preload surface以及Main对webContents/main frame/origin/method/schema/unknown key/depth/bytes/rate/request identity的拒绝
+- 验证Event/Terminal同一byte-credit：exact encoded`frameByteLength`、`grantBytes`、debit-before-send、contiguous ack、256KiB frame/4MiB outstanding/8MiB queue/30s pause、无lifetime cap、cancel/stale/slow
+- 验证`app.requestSingleInstanceLock()`先于spawn；second-instance只接受`kind=activate`和可选opaque typed target，校验ID/512-byte/source，丢弃且不记录raw argv/cwd/path/URL/env/bootstrap值，并等待Runtime reconciliation后导航
 - 让 Runtime 绑定 loopback `port=0`，由操作系统原子分配端口，再通过 bootstrap channel 回报实际端口
-- 在 bootstrap 前用 OS 原子 supervisor lock 建立 per-data-root 单实例；Runtime 打开 SQLite 前再获取 datastore lock
-- 第二实例通过 OS 本机 IPC 激活现有窗口后退出；验证 Shell/Runtime crash、stale metadata 和 datastore lock 的有界回收
+- Electron app single-instance在bootstrap前已建立；Runtime打开SQLite前获取canonical data root的datastore lock，同root拒绝、distinct-root Runtime并行语义保持F0-A1不变
+- 第二Electron实例通过`second-instance`激活现有窗口后退出；验证Main/Renderer/Runtime crash、stale ready metadata和datastore lock的有界回收
 - 生成至少 256 bit 的会话令牌，并通过非命令行的受限启动通道传给 Runtime
 - 等待健康检查和协议版本确认
 - Runtime 异常时显示可操作错误
 - 关闭窗口时隐藏到托盘，并保持 Runtime、Runner、队列和计划工作
 - 托盘显式退出时默认请求 Runtime 安全暂停并持久化；Runtime 先为全部非终态 Run 建立 durable shutdown fence。只有存在 process/cleanup candidate 的 Run 才保存 typed completed/quiesced evidence 并冻结 ShutdownRecoveryPlan，再终止 in-flight launch 和 quiesced Handle；同 Run 内未被 plan owner 覆盖的 process-free pre-Attempt aggregate 仍按独立 Event 收敛。只有 matching stopped evidence、aggregate cleanup 与其它资源清理全部落盘，并为每个 Run 追加 `resumeOnStartup=false` completion Event 后，Runtime 才能返回 shutdown acknowledgement
-- 超时强制退出时 Shell 只请求 Runtime 对账；Runtime 不响应则写 supervisor shutdown marker 后终止进程树，由下次 Runtime 补写 interrupted 状态
+- 超时强制退出时Main只请求Runtime对账；Runtime不响应则写supervisor marker/脱敏诊断并终止Rust sidecar，不枚举Runner child；Runner containment与下次业务对账仍由Rust Runtime负责
 - 注销、关机、Runtime 崩溃和 Shell 崩溃后没有无主 Runner，并能在下次启动对账
-- Windows 使用 Job Object 或经证明的等价机制，macOS/Linux 使用进程组与父进程失联检测；Runner 的子进程也必须进入受控回收范围
+- Windows使用Job Object或经证明的等价机制，macOS/Linux使用进程组与父进程失联检测；Runner子进程由Rust Runtime纳入受控回收，Electron Main不枚举或逐个kill Runner child
+- 验证Workspace create lost response/Main restart先query原immutable commandId，selection只bound同command且不重复Workspace；验证Electron/Runtime crash、签名原子更新、卸载/重装
 
 ### 路径与数据
 
 - 解析资源目录、配置目录、数据目录和日志目录
-- Workspace 项目路径使用原生 Path API 原样保存
+- Renderer只接收`selectionRef/displayName/access/expiresAt`；Workspace create使用`projectSelectionRef`和`pathGrantSelections[]`，不得与持久化FileRoot/PathGrant ref混名。Main验证source/purpose/access/expiry/immutable commandId binding后解析真实路径，Runtime API/FileRoot/PathGrant/save meaning不变
+- Runtime内部Workspace项目路径继续使用原生Path API原样保存
 - 安装目录保持只读
-- 日志不包含令牌、密钥和完整环境变量
-- 凭据只保存到操作系统安全存储，业务文件只保存 secret reference
+- Renderer/Shell-exported DTO/error/diagnostic/telemetry和用户可导出log无bootstrap/raw path/env；restricted local lifecycle log可含non-secret PID/loopback port，但无token、raw secret-file contents/file path、request body或second-instance argv/cwd
+- 凭据由Rust Runtime/Rust平台适配器保存到OS安全存储，业务文件只保存secret reference；Electron Main不读取Runner/account token或评估PermissionGrant
 - selected paths 使用原生目录选择器并保留 read/write 授权
 
 ### Runner 分发
@@ -72,6 +80,7 @@ F0 不再比较 Rust 进程内、Python sidecar 和开发服务器三条路线�
 - 验证 ANSI、Unicode、光标、全屏 TUI、CLI 原生 `/` 命令和确认选择器
 - 验证窗口 resize、焦点切换、粘贴、Terminal 原生 Ctrl-C/interrupt 字节和退出码；控制字节本身不生成 Domain interrupt 命令
 - 验证 Terminal 与 Session 输入 owner 互斥
+- 验证 Terminal input-owner lease 绑定 `clientId + AgentInstance + RunnerHandleRegistration + Handle generation`，detach、重连、generation 变化和 retained readonly 不会双写
 - 验证 `pauseResume=true` 的 Runner 使用同一 Handle 暂停和继续，Handle 丢失不会被标记为恢复成功
 - 验证 CLI headless/RPC 模式与 TUI 互斥时明确报告 Terminal unavailable
 - 验证切换 Session/Terminal 不创建第二进程、新 AgentInstance 或新 Attempt
@@ -82,7 +91,7 @@ F0 不再比较 Rust 进程内、Python sidecar 和开发服务器三条路线�
 - 验证共享目录不会把不明来源修改归给最近活跃 Agent。
 - 验证 Git worktree 从冻结基线创建，并记录来源 ref、分支和目标集成基线。
 - 验证临时目录只清理 Runtime 创建且登记的目录。
-- 验证 `read_only`、`workspace_write`、`selected_paths` 和 `full_access` 的平台执行结果。
+- 验证`read_only`、`workspace_write`、`selected_paths`和`full_access`由Rust Runtime决策，并由Runtime/Runner Adapter/Rust平台sandbox或broker执行；Electron Main只提供picker primitive和opaque proxy。
 - 验证网络、外部进程、Workspace 外写入、破坏性命令和外部发布的 `allow | ask | deny`。
 - 验证 `ask` hook 在 operation 前持久化 PermissionOperationRequest，`approve_once` 只释放同 Handle generation 的匹配 operation/digest；批准回执 unknown 不自动重发，恢复同时检查 decision receipt 和 RecoveryCheckpoint。
 - 验证 PermissionGrant 普通 revoke/expire 追加 `permission.grant.status_changed`，并在同一事务使依赖的 Dispatcher lease/channel 失效或进入收敛；活动 Handle 不能热换更大 Grant。
@@ -101,6 +110,7 @@ F0 不再比较 Rust 进程内、Python sidecar 和开发服务器三条路线�
 - 验证 ScheduleFire 的 `scheduleId + occurrenceKey` 幂等，重复 tick、Run now 重试和 Runtime 重启不会重复创建 Run。
 - 验证 live/catch-up pass 与 `schedule.update | enable | disable | archive | run_now` 的竞态；generation、config digest、template、cursor 或 cutoff 变化时 stale pass 整批 abort/retry，不产生部分 fire、Queue Item 或 cursor 推进。
 - 验证五字段 cron 的 DST gap/fold、UTC elapsed interval、持久化 evaluation cursor，以及默认 `misfirePolicy=latest` 和可配置的 `skip | latest | all`。
+- 验证设备 timezone 到 IANA timezone 的平台映射；Windows 映射失败时要求用户显式选择，Client 不自行计算 Cron/DST occurrence。
 - 验证 `all` 超过上限只保留最新 N 次，`queue_latest` 在与 preparing/run-created 竞争时只取消尚未创建 Run 的旧等待项。
 - 验证多个 Queue Item 同时 eligible、priority 相同和 Runtime 重启后的领取顺序固定为 canonical comparator；reorder Event 的 `resultingQueuedOrder[]` 与实际领取一致。
 - 验证后台遇到未预授权权限时创建 Attention 和脱敏系统通知，不把 `ask` 静默改成 `allow`。
@@ -109,6 +119,8 @@ F0 不再比较 Rust 进程内、Python sidecar 和开发服务器三条路线�
 - 验证 checkpoint write-ahead barrier 在 durable ack 前、ack 后但操作发送前、发送后、远端确认后和结果提交前崩溃时都不会重复非幂等副作用；并行 operation 必须逐个分类。
 - 验证混合 committed/pending operation 的完整恢复计划：committed 项通过 `continue_after_commit` 跳过；`resume_runner` 只有在已验证 `checkpointResume` 与 continuation ref 时可用。
 - 验证安全退出 fence 覆盖全部非终态 Run，包括没有 registration/launch 的 preparing、resuming、Gate/Task 间隙、已 paused 和 idle Direct；只有 process/cleanup candidate 非空的 Run创建 ShutdownRecoveryPlan。process-free pre-Attempt aggregate 必须以独立 Event 阻塞 selection、系统 resolve 旧 request/target 的 open selection Attention、释放 assignment、撤销 Grant、用 `not_started` 终态化旧 AgentInstance并释放 capacity，再由 TaskExecution Event 释放 claim、清 target refs且保留 `safe_exit_before_launch` pending owner；该规则与同 Run 是否已有 plan 无关。
+- 验证typed shutdown progress、30秒后Continue waiting/Force quit，以及fence建立后不能用Shell Back/Esc撤销；Force quit中Main只写marker/脱敏诊断并终止owned Rust sidecar，不枚举/kill/reclassify Runner child，也不伪装安全暂停。
+- 验证 worktree/temporary directory 选择性整合的 staging/journal/atomic replace、回执丢失后的原 integration ID 对账，以及三平台均不会重复或部分应用 selected entries。
 - 验证混合 Run：root/其它 Task 有 live Handle并创建 plan，同时另一个 `ready | provisioning | blocked` TaskExecution 没有 process。shutdown completion 必须等待 Handle termination 和 process-free aggregate disposition 都落盘；`run.status.changed.resumeTargets[]` 同时持久化 plan recovery 与该 TaskExecution 的 `continue_pre_attempt`，后者创建无 recovery lineage 的新实例，且没有 record/TaskExecution owner 重叠。Runtime 在 resuming 中断后按原 target set 重放，不重新猜测。
 - 验证 fence 后先保存 typed completed/quiesced ShutdownFenceReceipt 和 ShutdownRecoveryPlan，quiesced 不等于 stopped；`recoverableAttempts[]` 与 `coordinationRecoveries[]` 对每个 Handle/Launch record 全局互斥，允许恢复的 candidate 恰好有一个 owner，不能回退到已清空 pending owner。
 - 验证 `terminate_launch`/`terminate_handle` 的 matching receipt 或 completed evidence 落盘后才能写 stopped、终态化 source Attempt/撤销 target lease并释放资源；全部收敛后必须追加带 fence ref、适用时的 plan ref 的 `run.status.changed(resumeOnStartup=false)`。
@@ -128,7 +140,11 @@ F0 可以使用最小 Runtime/Runner harness 验证进程、SQLite、计划幂�
 |------|---------|-------|-------|
 | 全新安装 | [ ] | [ ] | [ ] |
 | 首次启动和健康检查 | [ ] | [ ] | [ ] |
-| 登录自启/双击竞态、第二实例激活和 per-data-root lock | [ ] | [ ] | [ ] |
+| 精确Electron/Chromium/`@electron/fuses`、app://ensemble/CSP、安全factory和final-binary fuse readback | [ ] | [ ] | [ ] |
+| Preload/Main来源-schema-limits拒绝；external exact allowlist+native confirm；opaque selection bound(commandId) | [ ] | [ ] | [ ] |
+| Event/Terminal exact byte-credit预算、contiguous ack、stale port、slow consumer且无lifetime cap | [ ] | [ ] | [ ] |
+| process.resourcesPath签名sidecar且无PATH/env fallback | [ ] | [ ] | [ ] |
+| 登录/双击竞态、closed ActivationIntent、raw argv/cwd不记录、reconciliation后导航和data-root lock | [ ] | [ ] | [ ] |
 | 三个 Runner 的安装、版本、登录和能力探测 | [ ] | [ ] | [ ] |
 | 三个 Runner 分别启动、空闲休眠和进程树回收 | [ ] | [ ] | [ ] |
 | 三个 Runner 两两 ContextPackage 交接 | [ ] | [ ] | [ ] |
@@ -146,6 +162,7 @@ F0 可以使用最小 Runtime/Runner harness 验证进程、SQLite、计划幂�
 | 双角色 Dispatcher Handle 的单 replacement/lease owner | [ ] | [ ] | [ ] |
 | registered Handle 的 completed/quiesced evidence、`terminate_handle` 与 stopped/resource 顺序 | [ ] | [ ] | [ ] |
 | DispatcherCoordinationLaunch pending lease/dormant channel 与 commit 激活 | [ ] | [ ] | [ ] |
+| Workspace create lost-response/Main-restart原commandId对账且不重复 | [ ] | [ ] | [ ] |
 | Workspace 创建前/创建后 RunnerQualification 分离 | [ ] | [ ] | [ ] |
 | 三种执行目录创建、冲突和清理 | [ ] | [ ] | [ ] |
 | 四种权限档位和 selected paths | [ ] | [ ] | [ ] |
@@ -159,11 +176,15 @@ F0 可以使用最小 Runtime/Runner harness 验证进程、SQLite、计划幂�
 | 显式退出、注销和关机后无无主进程 | [ ] | [ ] | [ ] |
 | 重启后风险感知恢复 Workspace、Run 和 ScheduleFire | [ ] | [ ] | [ ] |
 | Direct Task 多轮、Amendment、End/skip/join 和 cancel cleanup 重放 | [ ] | [ ] | [ ] |
-| 浅色、深色、系统主题 | [ ] | [ ] | [ ] |
-| `zh-CN`、`en-US` | [ ] | [ ] | [ ] |
-| 标准 DPI 和高 DPI | [ ] | [ ] | [ ] |
+| Packaged forms CJK IME：composition Enter不提交、compositionend不重复 | [ ] | [ ] | [ ] |
+| Packaged Terminal CJK IME：composition Enter不发送、compositionend bytes不重复 | [ ] | [ ] | [ ] |
+| Packaged keyboard/focus/Escape/return-focus | [ ] | [ ] | [ ] |
+| forced colors/high contrast/accessibility tree | [ ] | [ ] | [ ] |
+| Narrator/VoiceOver/Orca-equivalent主流程 | [ ] | [ ] | [ ] |
+| 两种locale、浅/深/系统theme、标准/高DPI、reduced motion | [ ] | [ ] | [ ] |
+| Shell+sidecar签名原子更新、失败保留旧版与卸载 | [ ] | [ ] | [ ] |
 
-浏览器开发服务器只能证明 Client 可开发，不能替代以上证据。
+浏览器开发服务器和component测试只能证明Client可开发，不能替代任何packaged Electron、installed IME/a11y或final-binary fuse证据。
 
 ## 5. F4 产品复验
 
@@ -175,7 +196,7 @@ F3 关闭后，F4 必须在三个平台使用真实产品入口重复验证：
 - 在 `pi`、Codex CLI 和 Claude Code 之间传递 ContextPackage，覆盖三个 Runner 的发送和接收。
 - 分别打开三个 Runner 的 Session 和 Terminal，证明每个实例只有一个进程 Handle。
 - 搜索、导出和重启恢复消息、变更、交付结果和谱系。
-- 关闭窗口后继续一次 Run 和一次计划任务；确认安全退出必须在全部 launch/Handle termination receipt 和资源清理落盘后保持暂停且不自动恢复，强制或未确认退出进入风险恢复与 Attention。
+- 关闭窗口后继续Run/计划并验证safe quit；同时复验packaged forms/Terminal CJK IME、keyboard/focus、forced colors/a11y tree、screen reader、locales/themes/DPI/reduced motion。
 
 F0 harness 通过不能替代 F4 产品证据，单 Agent Run 也不能替代以上流程。
 
@@ -183,12 +204,12 @@ F0 harness 通过不能替代 F4 产品证据，单 Agent Run 也不能替代以
 
 关闭前必须提交：
 
-1. Rust sidecar、per-data-root 单实例托盘 supervisor、SQLite datastore lock、账本和本机 transport 的实证记录。
-2. 三平台构建配置和安装包命名规则。
+1. 固定Electron/Chromium、签名Rust sidecar、Electron single instance、Runtime datastore lock、托盘、账本和本机transport的实证记录。
+2. 三平台electron-builder、ASAR/integrity/extraResources、pinned fuse flip与两次readback、签名/公证、安装包和原子更新规则。
 3. Shell/Runtime 启动时序和失败处理。
 4. 数据、日志、资源和临时文件路径表。
 5. 三个用户安装 Runner 的九组合探测、权限和契约测试结果。
 6. Attempt/Coordination launch、RunnerHandleRegistration、typed shutdown/termination evidence、混合 Run aggregate、双角色 Dispatcher 唯一 recovery owner、completion Event、cleanup Unknown 和 recovery 对账的崩溃窗口证据。
-7. 三平台验收矩阵、命令、日志和截图。
+7. BrowserWindow owner、external native confirmation、ActivationIntent/log、Workspace create commandId、byte-credit、opaque selection、installed IME/a11y和三平台矩阵证据。
 
 Spike 通过后，结论写入 [m6-architecture.md](m6-architecture.md)、[m6-runner-adapter.md](m6-runner-adapter.md) 和开发计划，再开始生产实现。

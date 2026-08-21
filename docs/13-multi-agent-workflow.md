@@ -1,5 +1,7 @@
 # 多 Agent / 多工作区并行开发与审计规程
 
+> **HISTORICAL / NOT CURRENT AUTHORIZATION.** This file records a superseded Tauri-era plan, implementation, review, or ownership result. Current Electron shell architecture and implementation ownership are defined by [m6-electron-shell.md](specs/m6-electron-shell.md) and [m6-interaction-implementation-slices.md](specs/m6-interaction-implementation-slices.md).
+
 **状态**：现行（2026-08-18）  
 **产品**：Ensemble  
 **原则**：每个开发切片必须配对审计；项目骨架稳固后才允许多 agent 多工作区并行。

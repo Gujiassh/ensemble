@@ -26,7 +26,7 @@ AgentInstance 属于 Run，是某个 Seat 在本次运行中的具体执行实�
 
 Attempt 属于一次稳定的 TaskExecution，TaskExecution 再引用其 Task 定义。Retry 和 Recovery 在原 TaskExecution 下登记 pending work，完成 provisioning 后创建新 Attempt；Rework 创建新的 TaskExecution activation，再由同一 pipeline 创建其中的首个 Attempt。历史记录都不被原地覆盖。一个 Attempt 只有一个 primary AgentInstance；transient worker 可以引用该 Attempt，但不成为 Task 的共同 owner。一个 AgentInstance 可以按 Runner 能力连续承载同一 Seat 的多个 Attempt。
 
-连续承载只适用于同一个持久在线 Runner process handle。进程退出或恢复时重新启动 Runner，必须创建新的 AgentInstance，并通过独立 `recoveredFromAgentInstanceId` / `recoveredFromAttemptId` 连接历史，不能复用旧实例 ID 或借用 transient parent 字段。
+连续承载只适用于同一个持久在线 Runner process handle。进程退出或恢复时重新启动 Runner，必须创建新的 AgentInstance，不能复用旧实例 ID。formal Attempt recovery 只使用 `recoveredFromAgentInstanceId + recoveredFromAttemptId`；recovered transient 同时保留当前 recovery parent/spawn triple 和旧 transient/Attempt recovery pair；coordination-only recovery 只使用自己的 lease/registration triple且不得伪造 Attempt。
 
 ## 2. Active Seats 按来源和运行态分组
 
@@ -47,16 +47,24 @@ UI 必须允许按以下维度切换分组：
 - Run：按当前 Run 和 Attempt 展示活动实例。
 - Origin：按派生来源展示父 Agent、Task 和 spawn reason。
 - Runner：按实际 Runner Profile 分组或筛选。
-- Status：按 working、waiting、paused、failed 等运行态筛选。
+- Activity：按 `working | blocked | done | idle | unknown` 的简化活动投影筛选。
 
 分组规则：
 
 - 分组只改变投影，不改变 Seat、Task 或 Attempt 的语义关系。
 - 派生来源显示为可点击的记录，至少能定位到 parent AgentInstance、parent Attempt 或创建它的 Event。
-- 恢复来源也显示为可点击的历史记录，至少能定位到 source AgentInstance、source Attempt、recovery Event，以及本次重新签发的目录分配和权限授权。
+- 恢复来源也显示为可点击的历史记录，至少能定位到 source AgentInstance、适用的 source Attempt/coordination lease、recovery Event，以及本次重新签发的目录分配和权限授权。recovered transient 同时显示当前 parent/spawn 位置和旧 transient recovery 来源，不能丢掉任一棵树。
 - Project File 不归 AgentInstance 所有；文件来源仍由 Change Set 的观察证据决定。
 - 同一个 Seat 可以在不同 Run 中拥有不同 AgentInstance；不能用 Seat 名称代替实例 ID。
 - 同一个 AgentInstance 的 Session、Terminal、Activity、Change Set 和 Artifact 入口必须汇聚到同一运行上下文。
+- 点击 Seat 打开该 Seat 的长期 Session 聚合；点击 AgentInstance 行打开精确运行实例。Seat 同时存在多个非终态或 retained 实例时必须先显示实例选择器，不能自动选“最近活跃”或数组第一项。
+
+Activity 只用于快速扫描，不把复杂内部状态压成新的业务真源：
+
+- `working` 表示有可靠的活动执行信号；`blocked` 表示等待输入、权限、Attention 或其它明确阻塞；`done` 表示当前工作已有结构化终态；`idle` 表示 live formal Handle 当前没有活动 Attempt；无法可靠判断时必须显示 `unknown`。
+- Run/Task/Attempt status、Run health 和 RunnerResult outcome 分开展示。`done` 不等于 `succeeded`，`blocked` 不等于 `failed`。
+- 证据优先级是 canonical Runtime state、官方结构化 hook/RPC、Adapter lifecycle/receipt、已验证 provider session metadata、PTY/TUI heuristic、`unknown`。已知的 blocked/done/idle 先从 Task、Attention、Handle 和 disposition 投影；其它来源主要区分 working/unknown，不能覆盖 canonical 阻塞或终态。PTY heuristic 必须带短期过期时间，并在更高等级证据到达时被覆盖。
+- Terminal 文本、光标动画、持续输出、heartbeat 和 Agent 自述不能决定 Task 成功、权限批准、Artifact validity 或恢复动作。
 
 ## 3. AgentInstance 记录派生来源
 
@@ -71,8 +79,11 @@ activeAttemptId?
 attemptIds[]
 parentAgentInstanceId?
 parentAttemptId?
+spawnRequestId?
 recoveredFromAgentInstanceId?
 recoveredFromAttemptId?
+recoveredFromDispatcherCoordinationLeaseId?
+recoveredFromRunnerHandleRegistrationId?
 createdBy                 user | workflow | agent
 spawnReason
 runnerProfileId
@@ -92,8 +103,9 @@ stoppedAt?
 
 - `formal` 实例由已存在的 Seat 和 Workflow Task 启动，可以成为下游 Handoff 的正式 producer。
 - `transient` 实例是某个 Agent 为当前 Attempt 临时派生的 worker。它必须有 `parentAgentInstanceId` 和 `parentAttemptId`，不能凭空出现在 Organization，也不能被其它 Task 直接指派。
-- `parentAgentInstanceId` / `parentAttemptId` 只记录 spawn；进程退出后创建的新实例使用成对的 `recoveredFromAgentInstanceId` / `recoveredFromAttemptId`。恢复链和派生树是两种独立投影。
-- formal 实例没有活动 Attempt、待投递消息、Terminal 连接或 active DispatcherCoordinationLease 时默认空闲 30 分钟后停止；非终态 Direct Run 只使用自己的 idle-close timer，不并行停止 Handle，关闭后由 finalization 回收。长期 Session 继续存在，下次工作创建新的 Direct Run 和 AgentInstance。
+- ordinary transient 只携带完整 `parentAgentInstanceId + parentAttemptId + spawnRequestId`；formal Attempt recovery 只携带完整 `recoveredFromAgentInstanceId + recoveredFromAttemptId`。recovered transient 同时携带两组：parent refs 指向本次 recovery Attempt 中实际监督它的 replacement parent，recovery pair 指向旧 transient/source Attempt，`spawnRequestId` 仍指向同一 supervised-dispatch lineage。恢复链和派生树是两种独立但可同时存在的投影。
+- coordination-only recovery 只携带 `recoveredFromAgentInstanceId + recoveredFromDispatcherCoordinationLeaseId + recoveredFromRunnerHandleRegistrationId`，parent/spawn triple 和 `recoveredFromAttemptId` 必须为空；它不得创建或伪造 TaskAttempt。
+- formal 实例没有活动 Attempt、待投递消息、Terminal 连接或 coordination protection 时默认空闲 30 分钟后停止；保护包括 active/rotating DispatcherCoordinationLease、面向同一 continued Handle 的 pending replacement lease/launch 和未终态 CoordinationLaunch。非终态 Direct Run 只使用自己的 idle-close timer，不并行停止 Handle，关闭后由 finalization 回收。长期 Session 继续存在，下次工作创建新的 Direct Run 和 AgentInstance。
 - transient 实例在父 Attempt 交付、失败或取消收尾后停止，不因用户继续对话而转成长期 Seat。
 - 如果临时 worker 需要独立负责 Task、拥有独立审批或向其它 Seat 交付，Runtime 必须创建 Run Amendment，新增正式 Seat/Task/Handoff 关系后再启动 formal 实例。
 - “Active Seats” 可以显示 transient worker，但要明确标记 `Spawned worker` 和来源，不把它伪装成可复用岗位。
@@ -124,7 +136,9 @@ Agent 不能通过自然语言直接修改 Organization。Agent 发起的派生�
 
 `auto` 只表示不等待用户点击批准，仍必须执行权限、目录、Runner、并发和交付契约校验。`ask` 为每次派生创建 `spawn_approval` Attention；批准只继续 transient spawn，不生成 Amendment。`deny` 拒绝 Agent 发起的派生，但不影响 Workflow 已定义的 formal Seat。达到预算时保留请求并创建 Attention，不静默停止已有实例。`staffing_request` 只用于新增 formal Seat/Task。完整目录和权限规则见 [m6-execution-workspace-security.md](m6-execution-workspace-security.md)。
 
-派生成功链路固定为：创建带 source/digest 的 canonical SpawnRequest 与 `agent.spawn.requested` -> 原子预留 capacity 并创建绑定 `spawnRequestId` 的 transient AgentInstance -> 从父 Grant 与 RunSnapshot 求交集得到独立 PermissionGrant -> Runtime 向父 Handle 发起绑定 worker ID/request digest 的 ExecutionWorkspaceSelectionRequest -> 父 Agent 结构化返回 selection -> 独立 ExecutionWorkspaceAssignment -> 绑定 SpawnRequest 的 worker-targeted ContextPackage/AttemptLaunch -> Adapter 两阶段 prepare/commit -> 可靠 receipt 后 `agent.context.delivered` 并把 SpawnRequest 置为 launched。父 Runner 必须同时具备 `transientSpawn`、`workspaceDispatch` 和 request dedupe。Failed 时把同一 SpawnRequest 置为 blocked/failed，追加对应 Event，终态化 worker 并释放目录/capacity；父 Attempt 继续作为唯一业务 owner，不因 worker 启动失败被改绑。WorkerResult 和 delivery 继续回指该 SpawnRequest。
+派生成功链路固定为：创建带 source/digest 的 canonical SpawnRequest 与 `agent.spawn.requested` -> 原子预留 capacity 并创建绑定 `spawnRequestId` 的 transient AgentInstance -> 从父 Grant 与 RunSnapshot 求交集得到独立 PermissionGrant -> Runtime 向父 Handle 发起绑定 worker ID/request digest 的 ExecutionWorkspaceSelectionRequest -> 父 Agent 结构化返回 selection -> 独立 ExecutionWorkspaceAssignment -> 绑定 SpawnRequest 的 worker-targeted ContextPackage/AttemptLaunch -> Adapter 两阶段 prepare/commit -> 可靠 receipt 后 `agent.context.delivered` 并把 SpawnRequest 置为 launched。父 Runner 必须同时具备 `transientSpawn`、`workspaceDispatch` 和 request dedupe。Failed 时把同一 SpawnRequest 置为 blocked/failed，追加对应 Event，终态化 worker 并释放目录/capacity；父 Attempt 继续作为唯一业务 owner，不因 worker 启动失败被改绑。WorkerResult 和 delivery 继续回指该 SpawnRequest。SpawnRequest 的 `targetWorkerAgentInstanceId` 固定指向首次 worker；进程恢复不改写它，recovered transient 以同一 `spawnRequestId` 加 parent/spawn triple 与 Attempt recovery pair 进入该 lineage。
+
+这条链路是 supervised dispatch，不是 ownership handoff。父 Attempt 保持唯一业务 owner，worker 只能回传结果；当另一个正式 Task/Seat 接管后续责任时，Runtime 才创建携带 Artifact refs 的 Handoff。已经活动的 Task 需要换 owner 时必须通过 Run Amendment/Rework 创建新的责任关系，不能原地修改 owner 或把 worker 升格成 formal Seat。
 
 ## 4. 不同 CLI 通过 Runtime 协作
 
@@ -179,17 +193,22 @@ sourceHandoffIds[]
 inputArtifactRefs[]
 acceptedDecisionRefs[]
 relevantMessageIds[]
+diffReviewBundleRefs[]
 workspaceScope
 executionWorkspaceAssignmentId
 permissionGrantId
 expectedOutputContractIds[]
+coordinationContractRef
+operationGuideRef
+allowedRuntimeOperations[]
+completionReceiptSchemaRef?
 parentAgentInstanceId?
 returnToAgentInstanceId?
 createdAt
 contentDigest
 ```
 
-Runner Adapter 再把这份包渲染成目标 CLI 能理解的输入。Runtime 注入只是投递机制，不是协作事实的存储位置；所有交接仍以 Task、Handoff、Artifact、Event 为准。Primary 和 transient worker 不能复用同一个 ContextPackage。worker 包要求 `spawnRequestId`，其 assignment/grant 属于 worker，`returnToAgentInstanceId` 指向当前父实例，expected output contract 描述返回父实例的结构，而不是直接宣称 Task Artifact 已完成。
+Runner Adapter 再把这份包渲染成目标 CLI 能理解的输入。Runtime 注入只是投递机制，不是协作事实的存储位置；所有交接仍以 Task、Handoff、Artifact、Event 为准。协调合同、操作指南和 completion receipt schema 都使用 Runtime/Adapter 已协商的不可变版本；`allowedRuntimeOperations[]` 只列当前实例/Attempt 可调用的操作。版本不匹配时拒绝投递，不能依赖自然语言兼容。`completionReceiptSchemaRef` 对 primary/transient 必填，对不产出 RunnerResult 的 dispatcher coordination 必须为空。Primary 和 transient worker 不能复用同一个 ContextPackage。worker 包要求 `spawnRequestId`，其 assignment/grant 属于 worker，`returnToAgentInstanceId` 指向当前父实例，expected output contract 描述返回父实例的结构，而不是直接宣称 Task Artifact 已完成。
 
 `purpose=dispatcher_coordination` 只用于 DispatcherCoordinationLaunch：`dispatcherCoordinationLaunchId` 必填，`targetAttemptId`、`spawnRequestId`、父子实例引用和 expected output contracts 为空。它承载冻结的 Dispatcher TaskExecution、目录策略、assignment、Grant 和协调指令，只建立 Run-scoped workspace-selection channel，不产生业务 RunnerResult、Artifact 或 Handoff。
 
@@ -217,7 +236,23 @@ runnerReceipt?
 sourceSignalId?
 ```
 
-用户消息使用前三种 delivery mode。活动 Attempt 中的 conversation 和 instruction 都通过 Adapter `deliver_message` 投递，并用稳定 delivery ID、`message_receipt`、dedupe 和 unknown-state 规则更新状态；Terminal 持有输入权时 Session 不并发写入。Agent 回复由 Adapter 的结构化 `assistant_message` signal 进入 Runtime，固定使用 `author=agent`、`messageKind=conversation`、`deliveryMode=runner_output` 和 `deliveryStatus=recorded`，并绑定 AgentInstance、Attempt 与来源 signal。Runtime 按 `signalId` 去重后持久化 Message 和 `agent.message.recorded`；流式 delta 只做当前 Session 的临时显示，不能替代最终或明确 interrupted 的 canonical Message。
+用户消息使用前三种 delivery mode。活动 Attempt 中的 conversation 和 instruction 都通过 Adapter `deliver_message` 投递，并用稳定 delivery ID、`message_receipt`、dedupe 和 unknown-state 规则更新状态；Terminal 持有输入权时 Session 不并发写入。`next_attempt` 首版只允许 instruction，queued Message 不提供撤回或原地替换，更正通过追加新 instruction。Agent 回复由 Adapter 的结构化 `assistant_message` signal 进入 Runtime，固定使用 `author=agent`、`messageKind=conversation`、`deliveryMode=runner_output` 和 `deliveryStatus=recorded`，并绑定 AgentInstance、Attempt 与来源 signal。Runtime 按 `signalId` 去重后持久化 Message 和 `agent.message.recorded`；流式 delta 只做当前 Session 的临时显示，不能替代最终或明确 interrupted 的 canonical Message。
+
+流式显示使用 Runtime presentation stream，不写 Domain Event：
+
+```text
+streamId
+agentInstanceId
+attemptId
+handleGeneration
+sourceSignalId?
+segmentSequence
+kind                         started | delta | completed | interrupted | discarded
+textDelta?
+observedAt
+```
+
+同一 stream 的 segment sequence 必须连续并绑定一个 Attempt/Handle generation；缺口、Attempt 变化、Handle generation 变化或 reconnect 后无法补齐时丢弃临时文本并从 Message ledger 恢复。canonical `assistant_message` 到达时通过 `sourceSignalId + attemptId` 原位替换临时占位，不能显示两条回复。流式 token 不逐 token 写历史或向读屏 live region 宣告。
 
 点击没有活动 AgentInstance 的 Seat 时，Session 只显示历史和 **Start direct task**，不能伪装为在线对话。用户确认后创建明确的 Direct Task/Run，再启动 AgentInstance；消息使用 `direct_task` 绑定新任务。
 
@@ -290,18 +325,66 @@ Terminal 是原样 CLI 视图，负责：
 - stdout、stderr、键盘输入和终端尺寸变化
 - 用户需要 CLI 原生交互时的逃生路径
 
-Terminal 不会绕过 Runtime 写入 Task、Artifact 或 Run 状态；原始输出仍需通过 Runner Adapter 归集。
+Terminal不会绕过Runtime写入Task、Artifact或Run状态；原始输出仍需通过Runner Adapter归集。Terminal、Artifact、用户消息和Runner输出可能自然包含路径，统一视为不可信敏感正文；Renderer/Main不得把正文中的路径、URL、命令或JSON提升为Shell capability、native selection、权限决定或外链。
 
 ### 5.3 切换和输入权
 
 - Session 与 Terminal 切换不重新启动进程，不创建新的 Attempt，不复制上下文。
-- Terminal 获得键盘输入权时，Session 输入框显示“Terminal active”，不能同时向同一 PTY 写入。
+- Terminal 可见不等于拥有输入权。Client 首次聚焦可写 Terminal 或显式选择“控制终端”时，通过 Runtime presentation channel 取得 `TerminalInputLease`：`leaseId + clientId + agentInstanceId + runnerHandleRegistrationId + handleGeneration + expiresAt`。同一 Handle generation 只有一个 active input lease；detach、切回 Session、连接失效、generation 变化或 expiry 时释放。重连必须重新申请，旧 lease 不能恢复双写。
+- Terminal 获得键盘输入权时，Session composer 显示明确的输入占用状态和释放动作，不能同时向同一 PTY 写入。retained Handle 的 Terminal 固定为只读，不创建 input lease。
 - Session 发送补充指令时，按 Runner capability 决定实时投递或进入下一次 Attempt，语义与 [m6-run-operations.md](m6-run-operations.md) 一致。
 - Runner 进程退出后，Terminal 显示冻结输出，Session 显示 canonical 终态和可用的恢复/重试动作。
-- PTY/ConPTY 的平台差异由 Shell/Runner Adapter 吸收，不能散落在前端组件中。
+- PTY/ConPTY平台差异和最终TerminalInputLease校验由Rust Runtime/Runner Adapter承担；Electron Main只做有界MessagePort字节代理，不能拥有Node PTY或独立放行输入。
 - 原样 Terminal 只在该 AgentInstance 从启动时就由交互式 PTY/ConPTY 承载时可用。如果某个 CLI 的 headless/RPC 模式与原生 TUI 互斥，Adapter 必须以交互式进程作为主 Handle，或把该 CLI 标记为 unsupported；不能另启一个 TUI 进程冒充同一实例。
 - 每个被 Ensemble 列为 supported 的 Runner 都必须同时提供 Session 和 Terminal 两种产品视图。需要同时保留原生 Terminal 和有限结构化 Session 的 Runner，以 PTY/ConPTY 实例为主；Session 只展示 Runtime、文件观察和 Adapter 能可靠提供的结构化事件，不解析屏幕文本猜测 Tool call。无法提供其中任一视图的 CLI 只能显示为 unsupported 或 needs configuration，不能以“部分支持”进入正式 Runner 选择。
 - Terminal transcript 可以写入受限的本地诊断存储，用于当前实例回看，但不是 canonical Event，默认按大小截断并遵守秘密脱敏规则。
+- 外部启动的 Terminal 没有正式 Adapter 提供的创建、控制、receipt 和 termination authority，不能附加为 AgentInstance 或进入正式 Workflow；它只能作为独立外部工具打开。
+
+Terminal presentation state 固定为 `connecting | live | reconnecting | disconnected | frozen | retained_readonly | transcript_unavailable`。这些状态不改变 AgentInstance lifecycle、Task outcome 或 Run health。原始按键包括 `Esc`、Ctrl-C 和 CLI slash command 都优先进入拥有 input lease 的 Terminal；Ensemble 只保留一个平台明确、不会被 CLI 普遍占用的退出全屏/释放输入快捷键，并在 Shell 层配置。
+
+### 5.4 Attempt 后的 Handle disposition
+
+Attempt 完成后，Runtime 必须对 Handle 明确选择 `reuse | retain | release`：
+
+- `reuse` 保持同一 formal AgentInstance 的 live Handle，等待后续正常 AttemptLaunch；不能直接把下一条业务输入写进 Terminal。
+- formal Handle 处于 coordination-protected 时，Runtime 必须自动记录 `reuse(reason=active_coordination_lease | coordination_rotation_in_progress)`；active/rotating lease、面向同一 continued Handle 的 pending replacement lease/launch 或未终态 CoordinationLaunch 可靠终结前，拒绝用户 retain/release 和 idle stop。Run finalization 先终结这些保护引用，再强制 release。
+- `retain` 只用于不受 coordination protection 的 formal AgentInstance，并由用户通过幂等命令明确要求现场调试/检查；transient worker 和 coordination-only Handle 必须 release。retained Handle 继续占用 capacity 并绑定原 assignment/grant，raw Terminal 变为只读/input-fenced，只允许 Adapter 声明的 typed、side-effect-free inspection operation；无法强制该边界的 Runner 不提供 retain。输出进入诊断/transcript，不接受新的业务 Message、spawn、Artifact、Handoff 或 completion receipt。
+- `release` 走 typed termination 并冻结 transcript/output；可靠 stopped evidence 前不能释放 capacity。
+- retained Handle 到期、用户结束、Run finalization、Grant/qualification 失效或 generation 变化时进入 release，且 expiry 优先于 Terminal attachment/idle timer。未被新 AttemptLaunch 消费且不受 coordination protection 时，初始 reuse 可以改为 retain/release；retain 只能改为 release。liveness/cleanup Unknown 创建 Attention，不能默认为 idle 或 reusable。每个 settled Attempt 都保留自己的不可变 disposition record，registration 上只投影最新记录。
+
+### 5.5 Detach 与 restore 不是同一件事
+
+| 场景 | UI | Conversation | Live process | Terminal transcript | Business operation |
+|---|---|---|---|---|---|
+| Client/Webview detach 或页面切换 | 从 Client 状态恢复 | 从 Message ledger 重载 | 不改变 | 可重新 attach 当前 live Handle | 不改变 |
+| 关闭窗口到托盘 | 重开窗口恢复 | 从 ledger 重载 | Runtime/Runner 继续 | 可重新 attach | 继续由原 Attempt 拥有 |
+| Runtime graceful exit | 重启后恢复 | 从 ledger 重载 | 旧 Handle 已可靠终止 | 冻结历史只读回放 | 创建新 AgentInstance/Attempt，按 recovery plan 恢复 |
+| Runtime crash / 注销 / OS shutdown | 重启后恢复 | 从 durable ledger 重载 | 必须先对账，不能假定存活或终止 | 只有已落盘部分可回放 | 按副作用证据恢复或进入 Attention |
+| Provider-native session resume | 不决定 | 可以作为 Adapter 私有上下文来源 | 新/重新接管的 provider session | 取决于 Adapter | 只有 matching checkpoint/receipt 才能继续；session 存在不证明 operation 状态 |
+| Transcript replay | 只读查看 | 不创建 canonical Message | 不存在要求 | 只读历史 | 不恢复、不重放、不证明完成 |
+
+`providerSessionResume` 是 Runner 可探测的可选 capability。它只能优化上下文续接；Runtime 仍创建明确的新 AgentInstance/Attempt 或完成合法 Handle control transfer，并按 RecoveryCheckpoint 判断业务 operation。UI、conversation、process、transcript 和 business operation 的恢复声明必须分别验收。
+
+### 5.6 Session 查询与 Client view state
+
+Runtime 的 Session read API 按 Event sequence 游标分页，支持 `seatId`、`runId?`、`agentInstanceId?`、`attemptId?` 和 message/activity 类型过滤。返回页包含 `items[] + beforeCursor? + afterCursor? + projectionSequence`；`createdAt` 只用于显示，不决定顺序。搜索返回稳定 Message/Event refs，Client 不在已加载片段中假装完成全历史搜索。
+
+设备端 `AgentWorkspaceViewState` 至少保存：
+
+```text
+workspaceId
+seatId
+agentInstanceId?
+selectedView                  session | terminal
+attemptFilter?
+timelineAnchor?
+composerDraft?
+attachmentDraftRefs[]
+terminalScrollAnchor?
+updatedAt
+```
+
+它不包含 input lease、canonical Message、delivery status、Run/Task state 或 Terminal transcript。切换 Workspace/Agent 后可以恢复滚动、草稿和附件；冷启动不得自动恢复可写 Terminal，最多恢复 Session 或只读 Terminal 位置。
 
 ## 6. Runner Adapter 的最低边界
 
@@ -344,8 +427,8 @@ Runner Adapter 不提供以下职责：
 ## 7. 验收标准
 
 - 用户能从 Active Seats 看到 Seat、AgentInstance、Attempt 和派生来源的区别。
-- 用户能从父 Agent 定位到 transient worker 的创建记录和目标上下文。
-- 每个 transient worker 都有独立 assignment、grant 和 target ContextPackage；`ask` 审批不会生成 formal staffing Amendment。
+- 用户能从父 Agent 定位到 transient worker 的创建记录和目标上下文；recovered transient 同时能定位当前 recovery parent/spawn triple 与旧 transient/Attempt recovery pair。
+- 每个 transient worker 都有独立 assignment、grant 和 target ContextPackage；ordinary transient、formal Attempt recovery、recovered transient、coordination-only recovery 逐项通过 lineage validation，`ask` 审批不会生成 formal staffing Amendment。
 - 不同 CLI 可以通过统一 Task/Handoff/Artifact/Context package 协作，不需要互相读取终端。
 - supported Runner 的实例在 Session 与 Terminal 间切换时不重启 CLI、不复制 Attempt、不产生第二份运行状态。
 - Terminal 能保留 CLI 原生 `/` 交互；Ensemble 不需要维护这些命令的推荐列表。
@@ -354,6 +437,10 @@ Runner Adapter 不提供以下职责：
 - Agent 发起的派生请求、用户补充指令和 Handoff 都有可重放的 Event 记录。
 - worker lifecycle 只终结 worker；WorkerResult 通过结构化回执交还父实例，不能从 Terminal 推断或直接终态化父 Attempt。
 - 看板、Active Seats、组织图和 Session 显示的是同一批稳定领域对象，不产生平行状态。
+- Activity 始终落在五个简化值之一，且用户可以区分 activity、业务 outcome 和 Run health。
+- supervised dispatch 不创建 Handoff；formal ownership handoff 必须指向目标 Task/Seat 和冻结 Artifact refs。
+- ContextPackage 的协调合同、操作指南和 completion receipt schema 版本不匹配时不会启动目标 Attempt。
+- Handle 完成后的 reuse、retain 和 release 都可追踪；retain 不产生新业务工作且继续占用 capacity。
 
 ## 8. 实施顺序
 

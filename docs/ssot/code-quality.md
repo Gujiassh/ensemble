@@ -1,12 +1,12 @@
 # Code Quality And Maintainability SSoT
 
-**Status:** active quality policy and CI contract (2026-08-21)
+**Status:** active current-code quality/CI contract, Electron documentation architecture ACCEPT, executable transition gates pending (2026-08-21)
 
 ## Scope And Phase Boundary
 
-**Independent acceptance evidence:** [Code Quality Gates Critical/Standard Review (2026-08-21)](../specs/reviews/Code-quality-gates-review-2026-08-21.md) is **ACCEPT** for this quality tooling/governance and CI contract. It does not authorize F0, F0-A1, Electron implementation, product behavior, persistence changes, commit, push, merge, deployment, or release.
+**Independent acceptance evidence:** [Code Quality Gates Critical/Standard Review (2026-08-21)](../specs/reviews/Code-quality-gates-review-2026-08-21.md) is **ACCEPT** for current quality tooling/governance. [M6 Electron Shell Architecture Critical Review](../specs/reviews/M6-electron-shell-architecture-review-2026-08-21.md) is **ACCEPT** and is the sole current Shell/security/transport/ownership Critical acceptance, but documentation-only. Neither review authorizes F0/F1 implementation, persistence changes, package work, commit, push, merge, deployment, or release.
 
-Ensemble quality gates are active now. They do not authorize F0, F0-A1, product behavior, persistence contracts, or a desktop-platform migration. F0 remains paused. Electron is the current documentation direction only; existing executable Tauri/Python paths remain gated until their owners authorize and implement a transition.
+Ensemble current-code quality gates remain active and F0 remains paused. Electron is the accepted target production Shell documentation architecture, but Electron source, manifests, package configuration, executable gates and three-platform evidence do not exist yet. Current CI still checks executable legacy Tauri/Python paths until the conjunctive code cutover condition is implemented and accepted; documentation ACCEPT does not make any Electron executable gate green.
 
 File size is one signal, not an architecture. The binding standard is coherent responsibility, explicit contracts, one-way dependencies, testability, and reproducible local/CI evidence.
 
@@ -94,7 +94,7 @@ Current decisions:
 - Discord preview TSX/CSS: temporary and frozen; delete or replace when preview review closes.
 - `WorkspaceCreateFlow.tsx`: split stable flow logic before another step/effect/validation responsibility.
 - legacy Python `run/registry.py`: freeze responsibilities/growth during Rust/Electron transition.
-- Tauri `runtime.rs`: freeze responsibilities/growth; lifecycle fixes require its owner and focused tests.
+- legacy current-code Tauri `runtime.rs`: freeze responsibilities/growth during direct Electron migration; any transition-period lifecycle fix requires the legacy owner and focused tests, and does not define target Electron architecture.
 
 ## Frontend Gates
 
@@ -114,7 +114,24 @@ Current decisions:
 
 ## Rust Gates
 
-Both `crates/ensemble-runtime` and `src-tauri` run format, production Clippy restrictions, all-target Clippy with `-D warnings`, and locked tests. `rust-toolchain.toml` pins Rust 1.95.0 with Clippy and rustfmt.
+The current aggregate runs format, production Clippy restrictions, all-target Clippy with `-D warnings`, and locked tests for both `crates/ensemble-runtime` and the executable legacy `src-tauri` code. `rust-toolchain.toml` pins Rust 1.95.0 with Clippy and rustfmt. The legacy Shell gate remains required until Electron cutover; it is current-code coverage, not target-architecture approval.
+
+## Required Future Electron Gates
+
+These gates are requirements, not current commands or green evidence. The Electron implementation slice must add them to manifests, scripts, CI, and this SSoT together:
+
+- exact pinned Electron, `electron-builder`, and compatible `@electron/fuses` versions in manifest/lockfile, with exact bundled Chromium and security evidence;
+- strict Main/Preload TypeScript build, lint, unit and integration tests with no unresolved imports/identifiers;
+- BrowserWindow Security-factory assertions for `contextIsolation=true`, `sandbox=true`, `nodeIntegration=false`, `webSecurity=true`, `webviewTag=false`, no `remote`, no Node in worker/subframe, and architecture tests proving Lifecycle cannot construct/configure windows;
+- packaged `app://ensemble` load and CSP tests proving no arbitrary production URL/env redirect, `unsafe-eval`, remote content, navigation, window-open, or permission fallback;
+- frozen Preload exact `ShellMethod`/`ShellErrorCode` allowlist and Main rejection tests for wrong webContents, subframe, origin, method/key, prototype pollution, depth/bytes/rate/request identity and stale generation;
+- shell protocol schema tests under `packages/protocol/src/shell/**`, including Workspace-create immutable `commandId`, Client registry, query-before-resubmit lost-response flow, selection `bound(commandId)`, Main-restart reconciliation, and Renderer absence of raw path/bootstrap values;
+- MessagePort exact encoded byte-credit tests: `grantBytes`, `frameByteLength`, debit-before-send, contiguous monotonic ack, 256KiB frame, 4MiB outstanding, 8MiB queue, 30s pause, no lifetime cap, cancellation/stale/slow and Terminal lease;
+- Security-owned external-link tests for compile-time exact HTTPS targets, rejection matrix, 3/10s rate limit, Main native Cancel/Open and one-shot Platform execution; closed second-instance ActivationIntent/ID/512-byte/source/reconciliation/log tests; exact signed sidecar resolution;
+- post-package pre-sign fuse flip/readback and final installed-binary readback on three platforms for RunAsNode=false, NODE_OPTIONS=false, CLI inspect=false, embedded ASAR integrity=true, only-ASAR app=true and cookie encryption when supported; electron-builder ASAR/extraResources/signing/notarization/update/install/uninstall evidence;
+- architecture boundary tests preventing Electron Main/Preload from owning Node business Runtime/SQLite/PTY/Runner/Domain/save; packaged Windows/macOS/Linux CJK IME forms+Terminal, keyboard/focus/Escape/return-focus, forced-colors/high-contrast/a11y tree, Narrator/VoiceOver/Orca-equivalent, locales/themes/DPI/reduced-motion evidence. Browser/component evidence cannot substitute.
+
+The direct transition condition is conjunctive: future F0-A2 implementation and its separate independent implementation Critical review pass; F0-A3 Windows/macOS/Linux package/lifecycle proof passes; the new Electron commands run inside the exact `pnpm quality` CI aggregate; and the owner accepts removal of the legacy production Shell gate/code. The same cutover slice must remove, not retain in parallel, legacy production-shell commands and CI paths. Until then, current Tauri checks remain mandatory and no Electron gate may be reported as existing or green.
 
 ## Repository And CI Hardening
 
@@ -140,7 +157,7 @@ pnpm quality:format
 pnpm quality:frontend
 pnpm quality:python
 pnpm quality:rust:runtime
-pnpm quality:rust:tauri
+pnpm quality:rust:tauri  # current legacy Shell gate until accepted Electron cutover
 ```
 
 GitHub Actions installs the pinned toolchains and runs only the same `pnpm quality` aggregate. CI does not publish, deploy, or implement product behavior.
@@ -164,11 +181,12 @@ Verified on the current Linux environment:
 - TypeScript graph: **68 files / 144 edges**, 19 bounded debt edges, zero errors.
 - Python graph: **29 files / 45 edges**, including service and Runner tests, zero errors.
 - Rust direction: 0 active layered files, explicitly N/A; ten crate/self/super adversarial tests pass.
-- Markdown: **66 authored files / 344 local targets**, zero missing.
+- Markdown: **68 authored files / 412 local links**, zero missing (`pnpm quality:links`, 2026-08-21 Electron documentation migration, Critical repair, and accepted review artifact).
 - Frontend formatter: **69 files**, four exact frozen preview debts, zero unlisted differences.
 - Canvas: zero-warning lint, strict typecheck, **42/42 tests**, production build passed.
 - Python Runtime/Runners: Ruff/format passed; **28/28 tests** passed.
 - Rust Runtime: fmt/Clippy passed; **6/6 tests** passed.
-- Tauri: frontend prerequisite, fmt/Clippy passed; **4/4 tests** passed.
+- Legacy current-code Tauri: frontend prerequisite, fmt/Clippy passed; **4/4 tests** passed. This is transition evidence only, not Electron acceptance.
+- Electron documentation architecture: **ACCEPT**. Electron executable implementation/gates: **not implemented and not green**; security/package and three-platform evidence remain pending.
 
 Linux process/lifecycle evidence does not close Windows/macOS packaging, signing, or platform smoke gates. Those remain future owner-gated work.

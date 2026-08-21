@@ -12,6 +12,7 @@
 - 父 Agent 不能给派生 worker 扩大自己的目录、权限、网络或发布范围。
 - 不同 Agent 的修改冲突必须进入检查或 Attention，不能静默覆盖。
 - 密钥不进入普通业务记录。完全权限不会关闭秘密脱敏。
+- Terminal、Artifact、用户和Runner正文可能自然包含路径，必须按不可信敏感内容处理；该内容通道不能被提升为Shell selection、权限或外链。结构化bootstrap/platform/DTO边界仍禁止raw token/port/path/process/env泄露。
 
 ## 2. 三种执行目录
 
@@ -20,6 +21,8 @@ Canonical 值为：
 ```text
 shared_workspace | git_worktree | temporary_directory
 ```
+
+这三个值是完整枚举：Git 和非 Git 项目都使用 `shared_workspace` 表示项目根；`git_worktree` 只在 Git Workspace 可用；`temporary_directory` 适用于两者。创建 worker 不隐式创建 worktree，目录模式始终由 Dispatcher/parent 在允许集合内显式选择并由 Runtime 校验。
 
 | 模式 | 适用工作 | 隔离边界 | 结果进入项目的方式 |
 |---|---|---|---|
@@ -103,16 +106,18 @@ Runtime 不能静默改用另一种模式。投递/response 超时、lease/paren
 review | auto_if_clean | manual
 ```
 
-默认是 `review`：Attempt 完成后冻结 Change Set 和交付结果，用户或 Review Gate 检查后选择 **应用结果**。`auto_if_clean` 只在 Change Set 完整、交付契约通过、目标基线未漂移且应用无冲突时自动整合。`manual` 永不修改目标项目，只保留 Diff、补丁或交付结果供外部处理。
+默认是 `review`：Attempt 完成后冻结 Change Set 和交付结果，Runtime 持久化 ResultReviewRequest 并通过 `execution.result.review_requested` 分配稳定 `resultReviewRequestId`；用户或 Review Gate 随后选择要应用的文件项、valid Artifact 或两者。`auto_if_clean` 只在选择并集非空、所选 Change Set entries（存在时）完整、所选 Artifact（存在时）已通过交付契约和完整性校验、目标基线未漂移且应用无冲突时自动整合。`manual` 永不修改目标项目，只保留 Diff、补丁或交付结果供外部处理。
 
 规则：
 
 - `shared_workspace` 的修改已经位于目标目录，不执行第二次整合；Review 只决定是否接受业务结果。
-- `git_worktree` 把冻结 Change Set 应用到记录的 `integrationTargetRef`。实现可以使用受控 merge/cherry-pick/patch，但 UI 命令和审计记录必须保持统一语义。
+- `git_worktree` 把选中的冻结 Change Set entries 应用到记录的 `integrationTargetRef`，并按 Artifact Contract 支持的目标表达整合选中的 valid Artifact；两类选择不要求同时存在。文件实现可以使用受控 merge/cherry-pick/patch，但 UI 命令和审计记录必须保持统一语义。
 - `temporary_directory` 只导入 Review 明确选择的文件或交付结果，不复制整个临时目录。
 - 目标基线漂移、文件冲突、完整性不足或验证失败时停止整合并创建 Attention；不能自动选择“ours/theirs”。
 - 整合先在受控 staging 状态验证，再写入目标。失败不能留下部分应用的文件；平台或 Adapter 无法保证这一点时，`auto_if_clean` 必须报告 unsupported。
-- 首版提供 **应用结果**、**保持隔离**、**拒绝** 和 **在外部工具中打开**。冲突解决完成后可以重试同一整合命令；每次尝试都要记录目标基线和结果。
+- **拒绝** 直接引用仍为 `review_requested` 且没有非终态 Apply attempt 的 `resultReviewRequestId`，并终态化 ResultReviewRequest；初始 Reject 不需要、也不创建 ResultIntegrationAttempt。每次实际 **应用结果** 才由 Runtime 创建回指该 request 的不可变 ResultIntegrationAttempt，记录 selected Change Set entries、selected valid Artifacts、目标基线、request digest 和结果。首次 Apply 要求 request 尚无 attempt；已有 failed attempt 后只能按原 selection Retry，不能无 retry ref 重新选择。`selectedChangeSetEntryRefs[]` 与 `selectedArtifactRefs[]` 的合并基数必须至少为一，任一数组可以为空；file-only、Artifact-only 和组合整合都是合法输入。`auto_if_clean` 由 Runtime 在创建 attempt 时把全部 eligible entries/Artifacts 冻结为 selected refs；不允许 Client 或 Adapter 隐式补选，也不允许 Client 生成 integration identity。
+- 写入回执不明时进入 `integration_unknown`，只按原 integration ID/digest 对账，不能自动再次应用。Result integration Retry 只允许 source `ResultIntegrationAttempt.status == failed`；`integration_unknown` 必须先对账并被 canonical 归类为 `failed`。不得从 `integrated`、`requested`、`staging`、`reconciling` 或 `integration_unknown` Retry；ResultReviewRequest 已为 `integrated | rejected` 时也不得创建 Apply。Retry 必须使用新 command ID 创建新的不可变 ResultIntegrationAttempt，以 `retryOfIntegrationAttemptId` 引用 source failed attempt，并重新执行正常的 target、expected baseline、selection、integrity 和 policy validation；source 一旦成为 `integrated`，Runtime 永远不得发起第二次 target write。
+- 首版提供 **应用结果**、**稍后处理**、**拒绝** 和 **在外部工具中打开**。稍后处理只关闭当前 Review 并保持 `review_requested`，不新增持久化 disposition。
 
 ## 3. Agent 派生策略
 
@@ -165,7 +170,7 @@ read_only | workspace_write | selected_paths | full_access
 | `selected_paths` | 仅按 `pathGrants[]` 读取或写入用户通过原生选择器添加的目录 |
 | `full_access` | 不限制文件系统和本地进程范围；界面持续显示高权限标记 |
 
-`pathGrants[]` 使用平台原生绝对路径，并分别记录 `read | write` 和 `attempt | run | workspace` 有效期。用户可以选择 Workspace 外目录；选择目录不等于永久授权，过期后必须重新授权。
+`pathGrants[]`在Rust Runtime内部继续使用平台原生绝对路径，并分别记录`read | write`和`attempt | run | workspace`有效期；该持久化合同与save meaning不变。Renderer/Shell shared DTO只使用`selectionRef/displayName/access/expiresAt`，Workspace create字段固定为`projectSelectionRef`和`pathGrantSelections[]`，不能与持久化FileRoot/PathGrant ref混名。Electron Main将selectionRef绑定来源/purpose/access/expiry/immutable commandId并解析为现有Runtime输入。用户可以选择Workspace外目录；选择目录不等于永久授权，过期后必须重新授权。
 
 文件权限之外，以下能力分别配置：
 
@@ -205,9 +210,9 @@ externalPublish            ask
 - Workspace 保存默认权限策略；RunSnapshot 保存解析后的有效策略。
 - Task 或 Seat 可以请求更小范围。请求扩大范围时，启动前必须由用户明确确认或匹配已保存的 Workspace 授权。
 - transient worker 继承父实例和当前 Run 的交集，只能缩小范围。
-- Runtime、Runner Adapter 和 Shell 共同执行权限；Prompt 中写“不要访问”不能代替技术限制。
+- Rust Runtime唯一拥有PermissionGrant策略解析、operation decision与扩大/拒绝裁决；Runtime、Runner Adapter和Rust/平台sandbox或broker共同执行技术限制。Electron Main只提供具名native picker/平台primitive并代理opaque selection，不能评估、扩大PermissionGrant或批准operation。Prompt中写“不要访问”不能代替技术限制。
 - 平台无法可靠执行某项限制时，Runner 探测结果必须标记 unsupported，不能把提示词约束显示为已隔离。
-- 文件和网络范围优先由平台 sandbox/broker 执行；破坏性命令和外部发布审批优先使用 CLI 官方 permission hook、RPC 或结构化 tool callback。
+- 文件和网络范围优先由Rust Runtime控制的Rust/平台sandbox或broker执行；破坏性命令和外部发布审批优先使用Runtime经Runner Adapter调用的CLI官方permission hook、RPC或结构化tool callback。Electron Main不参与decision。
 - Ensemble 不解析 Terminal 屏幕或自由文本来猜测命令是否危险。Adapter 没有可靠 hook，平台 broker 也无法拦截时，`destructiveCommands=ask` 或 `externalPublish=ask` 对该 Runner 是 unsupported capability。
 - 用户在已打开的 Terminal 中亲自输入并确认命令属于直接用户操作，但仍受文件、网络和进程硬边界限制；它不会永久扩大 Agent 的 PermissionGrant。
 
@@ -217,7 +222,7 @@ externalPublish            ask
 
 用户只能选择 `approve_once | reject`。批准记录精确 request/operation/digest 和 DecisionRecord，创建稳定 PermissionDecisionDelivery 并交还同一 hook；它不替换 PermissionGrant、不修改 Snapshot，也不授权下一次类似操作。receipt delivered 后才恢复 Attempt。请求超时在事务内转为 `expired`、以 system action 解决 Attention、创建 reject delivery，但不创建用户 DecisionRecord；相同 request/digest、timeout 和 delivery 重放返回原结果，不同 digest conflict。
 
-活动 Attempt/Handle 的 PermissionGrant 禁止原地扩大或轮换。尚无 AttemptLaunch、live Handle、coordination lease 或 operation 的 TaskExecution/AgentInstance，可以通过 `run.amend(replace_unstarted_permission_grant)` 原子创建新 Grant、撤销旧 Grant并追加 replacement Event。普通 Retry 沿用原 TaskExecution 的冻结 permission policy；活动工作需要更大权限时使用 `amend_and_rework`，在同一事务终结旧 Attempt/TaskExecution、为 Snapshot 后代和新 TaskExecution activation 冻结新 policy，再由统一 provisioning pipeline 创建新 AgentInstance 和 Grant。不提供隐式热更新 token 的旁路。
+活动 Attempt/Handle 的 PermissionGrant 禁止原地扩大或轮换。尚无 AttemptLaunch、live Handle、coordination lease 或 operation 的 TaskExecution/AgentInstance，可以通过 `run.amend(replace_unstarted_permission_grant)` 原子创建新 Grant、撤销旧 Grant并追加 replacement Event。普通 Retry 沿用原 TaskExecution 的冻结 permission policy；活动工作需要更大允许路径或能力时，唯一合法路径是 `amend_and_rework`：在同一事务终结旧 Attempt/TaskExecution、为 Snapshot 后代和新 TaskExecution activation 冻结新 policy，再由统一 provisioning pipeline 创建新 AgentInstance 和不可变 PermissionGrant。`approve_once` 只能放行当前 Grant 已标为 `ask` 的同一 operation，不能代替 `amend_and_rework`、添加路径或扩大 capability。不提供隐式热更新 token 的旁路。
 
 批准 delivery unknown 时 operation 保持 blocked，并创建 `permission_decision_delivery_unknown` Attention。只有同一 live hook 的 dedupe/query 能力可以确认原 receipt；禁止自动重新批准。Runtime 恢复时同时检查 request、decision delivery 和 operation RecoveryCheckpoint：已批准不等于已执行，receipt unknown 或副作用阶段 unknown 时必须等待用户核对，不能从 Terminal、文件存在或 Agent 自述猜测。
 
@@ -239,7 +244,7 @@ externalPublish            ask
 
 ### 6.1 默认保留
 
-- Message、DecisionRecord、Agent 谱系、Attention、交付结果和 Change Set 的内容随 Run 历史保留，直到用户按明确策略删除；canonical Event row 和仍被引用的 typed identity row 永不删除。
+- Message、DecisionRecord、Agent 谱系、Attention、交付结果、Change Set、ResultReviewRequest 和 ResultIntegrationAttempt 的内容随 Run 历史保留，直到用户按明确策略删除；canonical Event row 和仍被引用的 typed identity row 永不删除。
 - Archive 只从默认列表隐藏，不删除历史。
 - 原始 Terminal/stdout 诊断数据默认保留 30 天，并限制为每个 Run 100 MB；任一上限触发时优先清理最旧片段。
 - 用户固定的证据片段先经过脱敏，再创建 EvidencePin，不受原始 transcript 自动清理影响。
@@ -316,8 +321,9 @@ project_file | selected_diff_lines | deliverable | task | attention
 - 派生默认自动批准，实例/恢复预算、审批模式和运行中调整都可配置、可审计。
 - 用户能使用四个权限档位、原生目录选择器和五项独立能力策略。
 - transient worker 不能扩大父实例权限或绕过派生预算。
+- 活动工作需要更大路径或 capability 时只能 `amend_and_rework` 并创建新 Snapshot/TaskExecution/AgentInstance/PermissionGrant；热扩大 Grant 和用 `approve_once` 代替都被拒绝。
 - 完全权限有持续可见标记，且不会关闭秘密脱敏。
 - 业务历史可搜索、可导出、可恢复；原始 Terminal 受 30 天和每 Run 100 MB 默认上限约束。
 - Session 可以附加文件、Diff 行、交付结果、Task 和 Attention，并保持版本与来源。
-- worktree/临时目录结果默认先检查再应用；自动整合只在完整、已验证、基线未漂移且无冲突时发生，失败不留下部分写入。
+- worktree/临时目录结果默认先检查再应用；`execution.result.review_requested` 先创建稳定 ResultReviewRequest，初始 Reject 只引用其 ID 且不创建 Apply attempt。file-only、Artifact-only 和组合选择均可整合，合并选择至少一项；自动整合只在适用于所选类型的完整性/契约校验通过、基线未漂移且无冲突时发生，失败不留下部分写入。
 - Allowed paths 作为独立文件根显示；`full_access` 的未登记 root 外变化只能标记为 partial。

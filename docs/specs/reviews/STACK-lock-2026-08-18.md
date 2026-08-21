@@ -1,5 +1,7 @@
 # Stack Lock Audit — 2026-08-18
 
+> **HISTORICAL / NOT CURRENT AUTHORIZATION.** This file records a superseded Tauri-era plan, implementation, review, or ownership result. Current Electron shell architecture and implementation ownership are defined by [m6-electron-shell.md](../m6-electron-shell.md) and [m6-interaction-implementation-slices.md](../m6-interaction-implementation-slices.md).
+
 **触发**：用户要求同步扫未锁技术项、判决并审计  
 **真源**：`docs/ssot/stack.md` · D018 · T001–T023  
 **审计模式**：Main 自检 + 双 explore 独立审计（read-only）  

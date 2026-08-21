@@ -1,5 +1,7 @@
 # M4 Spec — Tauri Shell + PiRunner
 
+> **HISTORICAL / NOT CURRENT AUTHORIZATION.** This file records a superseded Tauri-era plan, implementation, review, or ownership result. Current Electron shell architecture and implementation ownership are defined by [m6-electron-shell.md](m6-electron-shell.md) and [m6-interaction-implementation-slices.md](m6-interaction-implementation-slices.md).
+
 **状态**：Historical ACCEPT；D019 后不再作为 V2 验收  
 **阶段**：M4  
 **主责**：`src-tauri/**`、`runners/pi/**`；runtime 启动集成；canvas 仅桌面适配  

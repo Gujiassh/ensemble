@@ -90,7 +90,7 @@ Project
 Allowed paths
 ```
 
-`Project` 是 Workspace 项目目录。`Allowed paths` 只列出 PermissionGrant 中明确选择的目录，每个目录显示 read/write 和有效期；不会因为 `full_access` 自动展开整台机器。用户可通过原生目录选择器添加路径。
+`Project` 是 Workspace 项目目录。`Allowed paths` 按来源分组显示 Workspace 默认授权和当前 Run/Agent 的有效 PermissionGrant，每个目录显示 read/write、scope 和有效期；不会因为 `full_access` 自动展开整台机器。用户通过原生目录选择器添加路径时只修改 Workspace 默认授权，不能热扩大活动 Agent 的 Grant。活动工作需要更大路径或 capability 时唯一合法入口是 exception Attention 的 `amend_and_rework`：终结旧工作，为 Snapshot 后代和新 TaskExecution activation 冻结 policy，再创建新的 AgentInstance 和不可变 PermissionGrant；`approve_once` 只裁决当前 Grant 中一个 `ask` operation，不能替代该路径。
 
 文件树支持：
 
@@ -102,7 +102,7 @@ Allowed paths
 - 展开项目目录或使用系统默认应用打开文件
 - 在 Project 和 Allowed paths 之间切换，保持独立展开和搜索状态
 
-首版不提供代码编辑、保存、Stage、Discard、Commit、完整 Git 管理或内置合并冲突编辑。隔离结果检查提供 **应用结果**、**保持隔离**、**拒绝** 和 **在外部工具中打开**；应用冲突进入 Attention。
+首版不提供代码编辑、保存、Stage、Discard、Commit、完整 Git 管理或内置合并冲突编辑。隔离结果检查提供 **应用结果**、**稍后处理**、**拒绝** 和 **在外部工具中打开**；应用冲突进入 Attention。
 
 ### 4.2 Agent 检查器
 
@@ -122,6 +122,12 @@ Seat / Agent 详情固定提供：
 - Review 默认打开待审 Change Set，再展示 Artifact Contract、验证结果和 Agent 摘要。
 - Approve / Reject 只作用于对应 Gate 或 Attention，不隐式 Stage、Commit 或修改文件。隔离结果使用单独的 **应用结果** 命令，确认目标基线和影响文件后才写入项目。
 
+### 4.4 Viewer 路由与历史
+
+File、Diff 和 Artifact 共用一个 inspection location。首次打开时冻结来源 surface、对象选择、检查器 tab、Canvas viewport 和滚动位置为 origin；后续 Viewer target 切换只追加内部 history，不能改写 origin。
+
+V1 每个 inspection location 的 Viewer internal history 固定最多保留 50 个 target。追加第 51 个 target 时必须只淘汰最旧的内部 history entry；冻结的 origin 永不计入、永不淘汰或改写。**Back** 先遍历剩余内部 target，再返回 origin；**Close** 从任意 target 直接返回同一个 origin。淘汰内部 entry 不得导致 Close/Back 返回另一个 Workspace、Canvas viewport 或检查器选择。
+
 ## 5. Diff 查看器
 
 首版必须支持：
@@ -134,14 +140,25 @@ Seat / Agent 详情固定提供：
 - baseline / target 标识
 - 从 Attention 或 Artifact 定位到文件和行
 - 复制相对路径、复制选区和使用系统应用打开
+- 对明确 baseline/target 的行创建 Review thread，追加评论、解决或重新打开
+- 从一个或多个 open Review thread 发起 Rework；Client 只提交 canonical `reviewSelection { changeSetId, threadSelections[] { threadId, commentIds[] } }` 和目标选择，不接收也不提交 DiffReviewBundle ref
 
 首版可以后置：
 
-- 行内评论和 Review thread
 - 语义 Diff、AST Diff 和图片像素 Diff
 - Git Stage、Commit、Discard 和冲突解决
 
 Diff 内容和统计必须来自同一 Change Set，不能由客户端分别读取当前文件后临时拼接。
+
+每个行内 thread 必须固定 `changeSetId + baselineRef + targetRef + rootRef + relativePath + side + lineNumber + anchorDigest`。评论以不可变记录追加；thread 的 canonical status 只有 `open | resolved`。新 Change Set 产生后，旧 thread 仍停留在原 Diff；在新目标上无法精确重定位时派生显示 `outdated`，但不改写 thread status，也不能按相同行号自动迁移。Resolve 只关闭讨论，不表示 Gate 已通过或文件已修改。
+
+**Rework from review** 是显式 `run.rework` 快捷入口。Client payload 只包含 canonical `reviewSelection { changeSetId, threadSelections[] { threadId, commentIds[] } }`、eligible target selection、用户明确选择的相关 Artifact refs 和补充说明，永远不包含 Client 构造或缓存的 DiffReviewBundle ref；每个 `threadSelections[]` item 必须包含至少一个 `commentIds[]`。Runtime 重验全部引用属于 `reviewSelection.changeSetId`、thread 仍为 open、每个 comment 属于对应 thread，且整个 selection 仍可用于所选 target；随后在 `run.rework` 原子命令中创建包含 selected comment IDs、status-at-capture、event sequence 和 digest 的不可变 DiffReviewBundle，先追加 `diff.review.bundle.created`，再创建新的 TaskExecution activation，并在 canonical pre-Attempt pipeline 创建引用该 bundle 的 ContextPackage。任一校验或写入失败都不创建 Bundle、TaskExecution 或 ContextPackage。后续评论或 resolve 不改变已投递 bundle。评论不能直接修改 Workspace、重写旧 Attempt 或改变 Handoff；新 Attempt 完成后生成新的 Change Set，供用户逐项核对旧 thread。
+
+目标 Task 不能由 Client 自由猜选。Runtime 先返回 `eligibleTargetPlan`：同 Run 只包含当前 open Gate 的合法 `rejected` Transition target，并校验 Rework 迭代上限；其它反馈只能创建带来源谱系的 descendant Run。用户只能从该 plan 选择，提交时 plan、thread status、event sequence 或 target eligibility 变化则整批 conflict。相关 Artifact 必须由用户从同一 source Attempt/Change Set 的正式 valid Artifact 中明确选择，Runtime 再校验，不按“最新”自动加入。
+
+Thread 首评与 thread 在同一事务创建，首评不能为空。Comment 是不可变追加记录，不编辑或删除；修正通过追加评论。Resolved thread 必须先 Reopen 才能继续评论。Create、Add、Resolve 和 Reopen 都使用 compare-and-set，Client 在 canonical Event 前只显示局部 submitting，不乐观改写 thread。
+
+大 Diff 由 Backend 返回稳定 cursor、总/已加载 hunk 与 line 统计、`complete | truncated` 和截断原因；Client 不重新读取当前文件补齐历史 Diff。Binary、无法解码或超预算文件只能显示 metadata、外部打开和整体 Rework 说明，不创建行级 thread。
 
 ## 6. Artifact 预览
 
@@ -158,6 +175,14 @@ Diff 内容和统计必须来自同一 Change Set，不能由客户端分别读�
 
 历史 Artifact 读取其冻结内容。项目目录中同名文件后来变化时，不更新历史 Artifact 预览。
 
+Attempt 检查器在正式交付结果之外提供“结果接收”区，展示 ArtifactCandidate 的 `pending_validation | promoted | invalid | conflict` 投影。invalid 只显示 immutable ValidationRecord 和 Contract 诊断，不标为交付结果，也不能进入 Handoff/Gate。正式 Artifact 必须显示 `sourceArtifactCandidateId` 和 validation record 的追溯入口；blob 缺失或 digest mismatch 显示读取完整性错误，不把 Artifact 改写成 Contract invalid。
+
+### 6.1 隔离结果整合
+
+worktree 和 temporary directory 的隔离结果先由 Runtime 持久化 ResultReviewRequest，`execution.result.review_requested` 返回稳定 `resultReviewRequestId`。**应用结果** 必须引用该 request、确认 target baseline，并从其冻结的 eligible Change Set entries 或正式 valid Artifact 中显式选择整合集合。`selectedChangeSetEntryRefs[]` 与 `selectedArtifactRefs[]` 使用 OR cardinality：任一集合可以为空，二者合并后必须至少包含一项；file-only、Artifact-only 和两者组合都合法。首次 Apply 只在 request 尚无 attempt 时创建回指 request 的不可变 ResultIntegrationAttempt；选择集合创建后不可修改。已有 failed attempt 后只显示相同 selection 的 Retry，不允许重新选择后发起第二个首次 Apply。**拒绝** 只提交 `resultReviewRequestId`，在第一次 `review_requested` 即可执行，并直接终态化 request，不创建 ResultIntegrationAttempt。Shared Workspace 不显示 Apply，因为变更已在目标目录，Review 只决定业务接受。
+
+ResultReviewRequest 的状态为 `review_requested | integrated | rejected`；ResultIntegrationAttempt 专属于 Apply，交互状态为 `requested | staging | reconciling | integrated | failed | integration_unknown`。目标写入回执不明时只允许查看证据和对账原 attempt；不能自动重做。**Retry integration** 只在 source attempt 的 canonical status 已经是 `failed` 时可用；former Unknown 必须先 reconcile 为 `failed`。`integrated | requested | staging | reconciling | integration_unknown` 都禁止 Retry，request 已为 `integrated | rejected` 时也禁止 Apply。合法 Retry 使用新 command ID 创建新的不可变 ResultIntegrationAttempt，并以 `retryOfIntegrationAttemptId` 引用旧 failed attempt；旧 attempt 永不改写。**保持隔离** 改为 **稍后处理**，只关闭当前 Review，维持 `review_requested`，不新增隐式 disposition。
+
 ## 7. Activity 与原始输出
 
 Activity 默认是结构化时间线：
@@ -170,15 +195,19 @@ progress | decision | command | file_change | artifact | handoff | warning | err
 - Command 显示命令、工作目录、开始/结束时间、退出码和截断状态；环境变量与密钥必须脱敏。
 - 原始 stdout/stderr 按需展开，支持搜索、复制和下载，不作为 canonical 状态来源。
 - Runner 没有提供可靠文件操作关联时，变更来源显示 `unknown`，不能伪造 Agent 归属。
+- Agent 标题只显示 `working | blocked | done | idle | unknown` 的活动投影；Task outcome 和 Run health 分开展示。PTY/TUI heuristic 可以改善即时反馈，但必须过期，且不能升级为成功、权限或 Artifact 证据。
 
 ## 8. 文件系统与安全
 
-- 只允许浏览 Workspace project root 和 PermissionGrant 明确列出的 root；所有路径通过平台 Path API 规范化。
+- 只允许浏览Workspace project root和PermissionGrant明确列出的root；真实路径只在Rust Runtime/平台边界使用原生Path API规范化。Renderer路由和Shell structured DTO只持有typed ref/relativePath/opaque selection，不接收绝对路径。
 - 符号链接默认显示但不跟随当前 root 外；需要跟随时必须先把目标目录加入 PermissionGrant。
 - `.git`、依赖目录、构建输出和 `.gitignore` 内容默认折叠或隐藏，用户可以切换显示。
-- 已识别的密钥、凭据文件和 Runner secret 不直接预览；显示受限原因。
+- 已识别的密钥、凭据文件和Runner secret不直接预览；显示受限原因。
+- 文件、Diff、Artifact、Terminal和用户/Runner正文可能自然显示路径；这些内容按不可信敏感正文和导出规则处理，不能成为Shell目录授权、外链或Main方法输入。
 - 文件监听丢失事件或溢出时标记 tree stale，并要求重新扫描，不能继续声称视图是最新状态。
 - 大目录、大文件和二进制文件必须按预算读取，不能阻塞 Canvas、Run 事件或 Attention。
+
+对包含 100,000 个文件的验收数据集，Files tree 与文件名/相对路径 search 必须满足以下预算：文件处理产生的任一 Client main-thread task 不得超过 50ms；tree/search 活动期间，从 Client stream receipt 到对应 Run Event projection 可见的延迟不超过 200ms p95；从 Backend response 开始返回到首个 tree/search page 可见的延迟不超过 500ms p95。性能证据必须记录操作系统、平台版本、WebView/Runtime 版本、参考硬件、数据集生成方式、样本量和各 percentile；不能只提交开发者机器上的单次截图或平均值。
 
 ## 9. 空态与失败
 
@@ -188,7 +217,7 @@ progress | decision | command | file_change | artifact | handoff | warning | err
 | Change Set 尚未生成 | 显示生成中和对应 Attempt，不显示空 Diff |
 | 基线不可用 | 阻止 Review，显示原因和重新捕获/重新运行入口 |
 | 文件已在当前 Workspace 删除 | Diff 可读，当前文件预览显示已删除 |
-| Artifact 无法读取或完整性不符 | 标记 invalid，不回退到同路径当前文件 |
+| Artifact blob 无法读取或完整性不符 | 显示读取完整性错误，不改写 Contract validation，也不回退到同路径当前文件 |
 | 文件来源不明确 | 显示 Workspace change / unknown source，不分配给最近活跃 Agent |
 | `full_access` 的 root 外变更 | 显示“仅观察到的变更”，完整性为 partial，不允许完整变更 Gate 通过 |
 | Workspace 目录离线 | 历史 Artifact 和冻结 Diff 可读；当前 Files 不可用 |
@@ -202,8 +231,14 @@ progress | decision | command | file_change | artifact | handoff | warning | err
 - 授权外部目录显示在独立 Allowed paths 根，不与 Project 合并，也不因 full access 浏览整台机器。
 - Change Set entry 使用 `rootRef + relativePath`；完整性为 partial 时不能伪装成完整审查证据。
 - Review 可以直接定位到证据文件和行，证据不可用时不能完成审批。
+- 行内 Review thread 固定到不可变 Change Set；从评论发起 Rework 后能在新 Attempt 中追溯原 thread，并对比新旧 Change Set。
+- invalid ArtifactCandidate 不出现在交付结果；正式 Artifact 可追溯到唯一 Candidate 和 ValidationRecord。
+- 临时目录的应用集合完全来自显式 selected refs；selected Change Set entries 与 selected valid Artifacts 按 OR 计数，file-only、Artifact-only 均可提交；整合 crash/Unknown 不产生重复应用或部分成功声明。
+- `execution.result.review_requested` 创建持久化 ResultReviewRequest；用户不执行 Apply 也能只用 `resultReviewRequestId` Reject，且不会出现虚构的 ResultIntegrationAttempt。
+- Result Integration Retry 只从同一 request 下 canonical failed source 创建带新 command ID 和 `retryOfIntegrationAttemptId` 的新 attempt；former Unknown 未 reconcile 为 failed 前和其它全部状态都没有 Retry 入口。
 - Markdown、代码、JSON、图片、测试报告和未知二进制都有明确预览或不可预览状态。
-- 10 万文件级目录使用懒加载和搜索时不阻塞 Run 状态更新；具体性能预算在架构规格中确定。
+- 同一 inspection location 打开第 51 个 Viewer target 时只淘汰最旧内部 entry，50 个 target 的 V1 最大值和冻结 origin 均保持不变。
+- 10 万文件级目录满足 50ms main-thread hard limit、Run Event projection 200ms p95 和首个 tree/search page 500ms p95，并留下平台与参考硬件证据。
 - Windows、macOS、Linux 的路径显示、外部打开和符号链接规则语义一致。
 - `zh-CN`、`en-US` 下文件状态、Diff 统计和 Artifact 元数据不展示内部枚举。
 

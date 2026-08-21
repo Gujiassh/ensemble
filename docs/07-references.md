@@ -1,6 +1,6 @@
-# 参考与竞品（历史参考）
+# 参考与竞品
 
-> 本文用于记录早期竞品研究，不是当前产品术语或架构约束。当前设计语言见 [08-design-language.md](08-design-language.md)，当前架构见 [specs/m6-architecture.md](specs/m6-architecture.md)。
+> 本文记录参考来源，不直接充当产品术语或架构约束。已经采用的能力和明确排除项见 [m6-adopted-runtime-patterns.md](specs/m6-adopted-runtime-patterns.md)，当前设计语言见 [08-design-language.md](08-design-language.md)，当前架构见 [m6-architecture.md](specs/m6-architecture.md)。
 
 ## 定位空白
 
@@ -33,6 +33,14 @@ Ensemble 叠加为：
 | Vibe Kanban | agent+workspace+diff | Org Canvas 优先于看板 |
 | MS Conductor | DAG、HITL | 避免调试器气质 |
 | LangGraph Studio | 步进、time-travel | 仅 Debug 吸收 |
+| Herdr | 持久 PTY、原样 TUI、简洁 activity、detach/attach、进程所有权 | 不把 terminal/pane 当产品中心，不用 PTY heuristic 决定业务事实 |
+| Orca | Run/Task/Dispatch/Worker、worktree、文件/Diff review、completion receipt、恢复 | 不复制 IDE/集成套件，不让 Run 隐式调度或把 inbox 当协作真源 |
+
+Herdr 和 Orca 的研究结论：
+
+- Herdr 更接近持久终端工作区 Runtime；适合参考 PTY 生命周期、attach/detach 和原样 CLI 交互。
+- Orca 更接近完整 Agent Development Environment；适合参考 worker dispatch、结构化回执、workspace/Diff review 和运行恢复。
+- Ensemble 的差异不在“同时开更多 CLI”，而在用户能可视化定义并复用正式 Workflow，Runtime 以不可变 Snapshot、Artifact Contract、Attention、权限和恢复合同执行它。
 
 ## 执行 CLI
 

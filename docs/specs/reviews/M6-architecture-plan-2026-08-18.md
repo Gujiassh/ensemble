@@ -1,5 +1,7 @@
 # M6 Architecture Plan Review
 
+> **HISTORICAL / NOT CURRENT AUTHORIZATION.** This file records a superseded Tauri-era plan, implementation, review, or ownership result. Current Electron shell architecture and implementation ownership are defined by [m6-electron-shell.md](../m6-electron-shell.md) and [m6-interaction-implementation-slices.md](../m6-interaction-implementation-slices.md).
+
 **日期**：2026-08-18
 **状态**：**SUPERSEDED** by [M6-runtime-scheduling-review-2026-08-20.md](M6-runtime-scheduling-review-2026-08-20.md)
 

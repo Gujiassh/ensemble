@@ -3,7 +3,7 @@
 **Date**: 2026-08-20
 **Risk class**: Critical
 **Overall status**: IMPLEMENTATION PAUSED BY OWNER
-**Current slice**: F0-A1 Rust Runtime Bootstrap specification ready; implementation awaits owner authorization
+**Current slice**: F0-A1 Rust Runtime Bootstrap specification unchanged; Electron documentation does not authorize implementation
 
 ## 1. Purpose
 
@@ -22,10 +22,10 @@ Engineering completion is not owner acceptance. A later slice must not silently 
 | Slice | Deliverable | Status | Start condition |
 |---|---|---|---|
 | F0-A1 | Independent Rust Runtime bootstrap, authenticated loopback health, canonical data-root ownership, and datastore lock | SPEC READY · IMPLEMENTATION PAUSED | Owner authorizes implementation to resume |
-| F0-A2 | Tauri supervisor, per-data-root Shell ownership, second-instance activation, tray lifecycle, and explicit Runtime shutdown | PENDING | Owner accepts F0-A1 |
-| F0-A3 | Native Windows and WSL lifecycle proof, process-tree cleanup, and evidence writeback | PENDING | Owner accepts F0-A2 |
+| F0-A2 | Electron Supervisor/Security Bridge: Security-owned BrowserWindow/external confirm, closed activation, Workspace-create commandId/selection binding, exact byte-credit streams, and signed sidecar | PENDING | Owner accepts F0-A1 and explicitly authorizes F0-A2 |
+| F0-A3 | Windows/macOS/Linux Electron+Runtime lifecycle, final-binary fuse readback, signing/update/uninstall, closed activation/log proof, and installed-app IME/a11y matrix | PENDING | Owner accepts F0-A2 |
 
-macOS build and native lifecycle evidence remains part of the wider F0 platform matrix. It does not prevent F0-A1 development or Windows/WSL acceptance.
+Windows, macOS, and Linux Electron lifecycle evidence belongs to F0-A3. It does not change any F0-A1 Runtime contract or authorize F0-A1 implementation.
 
 ## 3. F0-A1 scope
 
@@ -116,7 +116,7 @@ The acceptance record must include the commit SHA, operating system, commands, o
 
 F0-A1 does not implement:
 
-- Tauri tray behavior or window activation
+- Electron tray behavior, BrowserWindow security, Preload/IPC, window activation, or updater
 - Shell-side supervisor ownership
 - SQLite Event ledger schema or business Domain commands
 - Runner discovery, AttemptLaunch, PTY/ConPTY, or permission enforcement
